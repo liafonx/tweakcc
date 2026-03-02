@@ -70,6 +70,7 @@ import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
+import { writeDiffSyntaxThemeOverride } from './diffSyntaxThemeOverride';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -158,6 +159,13 @@ const PATCH_DEFINITIONS = [
     name: 'Thinking block styling',
     group: PatchGroup.ALWAYS_APPLIED,
     description: 'Restore dim/gray + italic styling for thinking blocks',
+  },
+  {
+    id: 'diff-syntax-theme-override',
+    name: 'Diff syntax theme override',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Custom themes use the ansi bat theme for diffs: syntax highlighting with no background fills',
   },
   {
     id: 'fix-lsp-support',
@@ -626,6 +634,9 @@ export const applyCustomization = async (
       condition:
         ccInstInfo.version == null ||
         compareVersions(ccInstInfo.version, '2.1.26') < 0,
+    },
+    'diff-syntax-theme-override': {
+      fn: c => writeDiffSyntaxThemeOverride(c),
     },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),

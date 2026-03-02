@@ -93,6 +93,10 @@ try {
 - **Identifier matching**: Use `[$\\w]+` instead of `\\w+` (includes `$` for React refs)
 - **Word boundaries**: Use `,` `;` `}` `{` literal characters at regex start instead of `\\b` for performance
 - **Avoid `\\b`**: Performance issue in V8, use literal alternatives
+- **Diff rendering**: The Rust `ColorDiff` module is used by two components:
+  - `nI` (diff view) — uses `hkB()`, calls `J.render(q,W,A)` where W is `Math.max(1,Math.floor($))`; anchored by that `Math.max` expression
+  - `aI` (file viewer) — uses `EkB()`, calls `J.render(q,$,B)` directly; leave untouched
+  - For custom themes, `nI` receives an unknown ID → default bat theme → bright backgrounds; `diff-syntax-theme-override` intercepts this by substituting `"dark-ansi"` for any non-builtin ID before the render call
 
 ### Testing
 

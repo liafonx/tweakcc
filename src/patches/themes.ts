@@ -3,6 +3,39 @@
 import { Theme } from '../types';
 import { LocationResult, showDiff } from './index';
 
+// Built-in theme IDs that ship with Claude Code — leave their diff colors untouched.
+const BUILTIN_THEME_IDS = new Set([
+  'dark',
+  'light',
+  'dark-ansi',
+  'light-ansi',
+  'dark-daltonized',
+  'light-daltonized',
+  'monochrome',
+]);
+
+// ANSI diff colors for dark-background custom themes.
+//
+// Two reasons for ansi:* instead of rgb():
+//   1. The Rust/bat renderer treats rgb() values as background fills on each
+//      diff line, which looks heavy and over-bright on dark terminals.
+//   2. ansi:* values are rendered as foreground-only (text colour, no background
+//      fill), matching the behaviour of the built-in "Dark mode (ANSI colours
+//      only)" theme — the style the user prefers.
+//
+// IMPORTANT: Do NOT switch these to rgb() values. That would re-introduce
+// background fills on diff lines and defeat the purpose of this patch.
+const CUSTOM_DARK_DIFF_COLORS = {
+  diffAdded: 'ansi:green',
+  diffRemoved: 'ansi:red',
+  diffAddedDimmed: 'ansi:green',
+  diffRemovedDimmed: 'ansi:red',
+  diffAddedWord: 'ansi:greenBright',
+  diffRemovedWord: 'ansi:redBright',
+  diffAddedWordDimmed: 'ansi:green',
+  diffRemovedWordDimmed: 'ansi:red',
+} as const;
+
 function getThemesLocation(oldFile: string): {
   switchStatement: LocationResult;
   objArr: LocationResult;
@@ -104,13 +137,20 @@ export const writeThemes = (
   oldFile = newFile;
 
   // Update switch statement
+  // For custom (non-builtin) themes, override diff colors with ANSI values so
+  // the Rust/bat renderer uses the terminal's own palette instead of rgb().
+  const resolveColors = (theme: Theme): Theme['colors'] => {
+    if (BUILTIN_THEME_IDS.has(theme.id)) return theme.colors;
+    return { ...theme.colors, ...CUSTOM_DARK_DIFF_COLORS };
+  };
+
   let switchStatement = `switch(${locations.switchStatement.identifiers?.[0]}){\n`;
   themes.forEach(theme => {
     switchStatement += `case"${theme.id}":return${JSON.stringify(
-      theme.colors
+      resolveColors(theme)
     )};\n`;
   });
-  switchStatement += `default:return${JSON.stringify(themes[0].colors)};\n}`;
+  switchStatement += `default:return${JSON.stringify(resolveColors(themes[0]))};\n}`;
 
   newFile =
     newFile.slice(0, locations.switchStatement.startIndex) +
