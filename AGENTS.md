@@ -1,5 +1,9 @@
 # AGENTS.md
 
+**tweakcc** is a CLI tool that patches Claude Code's native binary at runtime —
+injecting custom themes, model aliases, and diff-rendering fixes.
+`CLAUDE.md` is a symlink to this file.
+
 Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc).
 
 **Working dir**: `/Users/liafo/Development/GitWorkspace/tweakcc`
@@ -36,29 +40,121 @@ node dist/index.mjs --apply        # apply patches to Claude Code
 node dist/index.mjs --list-patches # list patch IDs and status
 ```
 
+## Source Layout
+
+```
+src/
+  index.ts                       # CLI entry (commander: --apply, --restore, --list-patches)
+  patches/
+    index.ts                     # Registry: PATCH_DEFINITIONS, patchImplementations, applyCustomization()
+    helpers.ts                   # Shared utilities: findChalkVar, getReactVar, etc.
+    themes.ts                    # Theme injection (incl. diff color overrides)
+    diffSyntaxThemeOverride.ts   # Fork: Rust renderer theme ID swap
+    opusplan1m.ts                # Fork: model alias support
+    modelSelector.ts             # Fork: CUSTOM_MODELS injection
+  tests/                         # Vitest: config, migration, systemPromptSync, etc.
+  ui/                            # Ink/React terminal UI (theme editor, color picker)
+  config.ts                      # ~/.tweakcc/ config read/write
+  types.ts                       # Theme (61 color keys), Settings, TweakccConfig
+```
+
+## Restore / Cache-Clean / Re-apply
+
+Run this sequence whenever patches fail (binary auto-updated, backup stale, or
+patterns changed after editing patches):
+
+```bash
+# 1. Reinstall Claude Code to get a known-clean binary
+brew reinstall claude-code
+
+# 2. Update the backup so tweakcc tracks the new binary
+cp "$(ls -d /opt/homebrew/Caskroom/claude-code/*/claude | tail -1)" ~/.tweakcc/native-binary.backup
+
+# 3. Rebuild the fork (skip if source unchanged)
+cd /Users/liafo/Development/GitWorkspace/tweakcc && npm run build
+
+# 4. Apply
+node dist/index.mjs --apply
+```
+
+**When to use `--restore` instead of reinstall:**
+`node dist/index.mjs --restore` reverts the live binary to `~/.tweakcc/native-binary.backup`.
+Use it only when the backup is still fresh (same CC version, no auto-update since last
+`--apply`). After restore, run `--apply` again.
+
+**Signs the backup is stale** (need reinstall, not just --restore):
+
+- `md5 /opt/homebrew/Caskroom/claude-code/*/claude ~/.tweakcc/native-binary.backup` → hashes differ
+- Multiple unrelated patches fail simultaneously (patterns changed)
+- File sizes differ between live binary and backup
+
 ## Theme System
 
 Config: `/Users/liafo/.tweakcc/config.json` → `.settings.themes[]` — **61 keys per theme**.
 
-Custom theme IDs: `sample1-coastal-harvest`, `sample2-solar-current`,
-`set-b1-indigo-bloom` … `set-b8-frost-gilt` (plus the 7 upstream built-ins).
+### Gist Sync
+
+- Gist: https://gist.github.com/liafonx/5d7b8fa2baab5e870e1a9010f6470131
+- Push update: `gh gist edit 5d7b8fa2baab5e870e1a9010f6470131 -f config.json /Users/liafo/.tweakcc/config.json`
+- Pull latest: `gh gist view 5d7b8fa2baab5e870e1a9010f6470131 -r > /Users/liafo/.tweakcc/config.json`
+
+### Theme IDs In Scope
+
+Built-ins: `dark`, `light`, `light-ansi`, `dark-ansi`, `light-daltonized`, `dark-daltonized`, `monochrome`
+
+Custom: `sample1-coastal-harvest`, `sample2-solar-current`, `sample3-deep-space-saffron`,
+`sample4-aurora-violet-frost`, `set-a1-neon-tide`, `set-a2-desert-signal`, `set-a3-coral-circuit`,
+`set-a4-emerald-orbit`, `set-a5-lime-current`, `set-a6-amethyst-ember`, `set-a7-blueforge-amber`,
+`set-a8-copper-nocturne`, `set-b1-indigo-bloom` … `set-b8-frost-gilt`
 
 ### Hard Invariants
 
-1. **Diff colours — `ansi:*` only, never `rgb()`** (rgb → solid background fills):
-   `diffAdded/Dimmed = ansi:green`, `diffRemoved/Dimmed = ansi:red`,
-   `diffAddedWord = ansi:greenBright`, `diffRemovedWord = ansi:redBright`,
-   `diffAddedWordDimmed = ansi:green`, `diffRemovedWordDimmed = ansi:red`
+1. **Diff colours — `ansi:*` only, never `rgb()`** — two rendering paths, both must be correct:
+   - Primary path: `diff-syntax-theme-override` patch (see Fork-Specific Patches above)
+   - Fallback path: JS renderer uses theme's diff values; `themes.ts` patch overrides them
+   - `rgb()` → background fills on every diff line; `ansi:*` → foreground-only (correct)
+   - Required values (binary + config.json):
+     - `diffAdded = ansi:green`, `diffAddedDimmed = ansi:green`, `diffAddedWordDimmed = ansi:green`
+     - `diffRemoved = ansi:red`, `diffRemovedDimmed = ansi:red`, `diffRemovedWordDimmed = ansi:red`
+     - `diffAddedWord = ansi:greenBright`
+     - `diffRemovedWord = ansi:redBright`
 2. `clawd_body = claude`
 3. `permission != planMode`, `permission != claude`, `permission != claudeShimmer`
 4. `claude` and `claudeShimmer` visually distinct per theme
+5. Keep all existing theme IDs unless user explicitly requests removal; keep all 61 keys per theme
+
+### Color Design Rules
+
+1. **Dark-background first**: mid/high lightness for accents (no near-black that vanishes)
+2. **Saturation**: moderate (dark-ansi baseline), not neon and not flat
+3. **Identity**: each theme keeps its own palette; `claude`/`claudeShimmer` differ from each other and from other roles
+4. **Semantic roles**: `claude`/`claudeShimmer` = assistant pair; `permission` ≠ `planMode` ≠ `claude`; `success`/`warning`/`error` = green/amber/red
 
 ### Validation
 
+Run after every color edit:
+
 ```bash
+# 1) key count
 jq -r '.settings.themes[] | [.id, (.colors|keys|length)] | @tsv' /Users/liafo/.tweakcc/config.json
-jq -r '.settings.themes[] | [.id, .colors.diffAdded, .colors.diffRemoved] | @tsv' /Users/liafo/.tweakcc/config.json
+
+# 2) diff indicators fixed (must be ansi:*, not rgb())
+jq -r '.settings.themes[] | [.id, .colors.diffAdded, .colors.diffRemoved, .colors.diffAddedWord, .colors.diffRemovedWord] | @tsv' /Users/liafo/.tweakcc/config.json
+
+# 3) permission linkage + separation
+jq -r '.settings.themes[] | [.id, (.colors.permission==.colors.suggestion), (.colors.permission==.colors.remember), (.colors.permission==.colors.rate_limit_fill), (.colors.permission==.colors.planMode), (.colors.permission==.colors.claude), (.colors.permission==.colors.claudeShimmer)] | @tsv' /Users/liafo/.tweakcc/config.json
+
+# 4) per-theme assistant pair
+jq -r '.settings.themes[] | [.id, .colors.claude, .colors.claudeShimmer] | @tsv' /Users/liafo/.tweakcc/config.json
 ```
+
+### Handoff Requirements
+
+When handing off, always report:
+
+1. Which theme IDs changed
+2. Whether all hard invariants passed
+3. Any manual compromises (if a palette could not satisfy all constraints)
 
 ## Writing Patches
 
@@ -69,10 +165,10 @@ jq -r '.settings.themes[] | [.id, .colors.diffAdded, .colors.diffRemoved] | @tsv
 
 ### Diff Render Sites
 
-| Component        | Fn      | Pattern                                                  | Fallback                |
-| ---------------- | ------- | -------------------------------------------------------- | ----------------------- |
-| `nI` diff view   | `hkB()` | `let W=Math.max(1,Math.floor($));return J.render(q,W,A)` | `qkB`                   |
-| `aI` file viewer | `EkB()` | `return J.render(q,$,B)`                                 | `IkB` — leave untouched |
+Two `J.render()` call sites exist in the CC binary (identifiers change per release):
+
+- **Diff view**: anchored by `Math.max(1,Math.floor(...))` before `J.render()` — this is the patched site
+- **File viewer**: a plain `return J.render(q,$,B)` — leave untouched
 
 ## Code Style
 
