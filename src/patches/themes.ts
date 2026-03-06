@@ -3,6 +3,19 @@
 import { Theme } from '../types';
 import { LocationResult, showDiff } from './index';
 
+// Built-in theme IDs that ship with Claude Code.
+// Exported so other patches can derive their own forms (regex, Set, etc.) from
+// a single source of truth.
+export const BUILTIN_THEME_IDS = [
+  'dark',
+  'light',
+  'dark-ansi',
+  'light-ansi',
+  'dark-daltonized',
+  'light-daltonized',
+  'monochrome',
+] as const;
+
 function getThemesLocation(oldFile: string): {
   switchStatement: LocationResult;
   objArr: LocationResult;
