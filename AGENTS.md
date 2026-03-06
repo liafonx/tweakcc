@@ -18,6 +18,7 @@ Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc
 | `76c2122` | fork-feature   | feat: add suppress-update-notification patch                                     |
 | `e8e6b1c` | fork-feature   | fix: update diffSyntaxThemeOverride and findTextComponent for CC 2.1.70          |
 | `9059293` | fork-fix       | fix: partition-safe regex for diffSyntaxThemeOverride if-block                   |
+| `a83e6ef` | fork-feature   | fix: update agentsMd and patchesAppliedIndication for CC 2.1.70                  |
 
 Previously in upstream (PRs now merged): model customizations (#572), context-limit opt-in (#577).
 
