@@ -11,11 +11,14 @@ Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc
 
 ## Fork Commits (must survive upstream rebases)
 
-| Commit    | Description                                                             |
-| --------- | ----------------------------------------------------------------------- |
-| `d6a3196` | fix: resolve plan-mode crash and make model customizations configurable |
-| `a114cca` | fix: preserve wrapper semantics in opusplan1m selector injection        |
-| `cfee0d4` | feat: replace Rust diff renderer bypass with theme ID override          |
+| Commit    | Status         | Description                                                                      |
+| --------- | -------------- | -------------------------------------------------------------------------------- |
+| `55b4453` | fork-permanent | feat: replace Rust diff renderer bypass with theme ID override                   |
+| `0017699` | fork-local     | chore: re-add UNKNOWN\_\* fallback to fork main for local use (not for upstream) |
+| `76c2122` | fork-feature   | feat: add suppress-update-notification patch                                     |
+| `e8e6b1c` | fork-feature   | fix: update diffSyntaxThemeOverride and findTextComponent for CC 2.1.70          |
+
+Previously in upstream (PRs now merged): model customizations (#572), context-limit opt-in (#577).
 
 Always rebase onto upstream — never merge: `git fetch upstream && git rebase upstream/main`
 
