@@ -711,6 +711,7 @@ export const DEFAULT_SETTINGS: Settings = {
     autoAcceptPlanMode: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
+    suppressUpdateNotification: false,
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
     enableContextLimitOverride: false,

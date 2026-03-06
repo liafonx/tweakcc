@@ -129,6 +129,7 @@ export interface MiscConfig {
   autoAcceptPlanMode: boolean;
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
+  suppressUpdateNotification: boolean;
   filterScrollEscapeSequences: boolean;
   enableWorktreeMode: boolean;
   enableContextLimitOverride: boolean;

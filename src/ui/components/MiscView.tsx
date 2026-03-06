@@ -77,6 +77,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     autoAcceptPlanMode: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
+    suppressUpdateNotification: false,
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
@@ -581,6 +582,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressNativeInstallerWarning =
               !settings.misc!.suppressNativeInstallerWarning;
+          });
+        },
+      },
+      {
+        id: 'suppressUpdateNotification',
+        title: 'Suppress update notification',
+        description:
+          'Hides the "Update available! Run: brew upgrade claude-code" banner.',
+        getValue: () => settings.misc?.suppressUpdateNotification ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.suppressUpdateNotification =
+              !settings.misc!.suppressUpdateNotification;
           });
         },
       },

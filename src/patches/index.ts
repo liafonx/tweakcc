@@ -68,6 +68,7 @@ import { writeAgentsMd } from './agentsMd';
 import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
+import { writeSuppressUpdateNotification } from './suppressUpdateNotification';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeDiffSyntaxThemeOverride } from './diffSyntaxThemeOverride';
@@ -355,6 +356,13 @@ const PATCH_DEFINITIONS = [
     name: 'Suppress native installer warning',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Suppress the native installer warning message at startup',
+  },
+  {
+    id: 'suppress-update-notification',
+    name: 'Suppress update notification',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Suppress the "Update available! Run: brew upgrade claude-code" banner',
   },
   {
     id: 'filter-scroll-escape-sequences',
@@ -798,6 +806,10 @@ export const applyCustomization = async (
     'suppress-native-installer-warning': {
       fn: c => writeSuppressNativeInstallerWarning(c),
       condition: !!config.settings.misc?.suppressNativeInstallerWarning,
+    },
+    'suppress-update-notification': {
+      fn: c => writeSuppressUpdateNotification(c),
+      condition: !!config.settings.misc?.suppressUpdateNotification,
     },
     'filter-scroll-escape-sequences': {
       fn: c => writeScrollEscapeSequenceFilter(c),
