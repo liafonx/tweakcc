@@ -82,29 +82,54 @@ export const writeAgentsMd = (
   showDiff(file, newFile, ',didReroute', sigIndex, sigIndex);
 
   // Step 2: Inject fallback at the early return null (when file doesn't exist)
-  const earlyReturnPattern = /\.isFile\(\)\)return null/;
   const funcBody = newFile.slice(funcStart);
-  const earlyReturnMatch = funcBody.match(earlyReturnPattern);
 
-  if (!earlyReturnMatch || earlyReturnMatch.index === undefined) {
-    console.error(
-      'patch: agentsMd: failed to find early return null for injection'
+  // Try pre-2.1.70 pattern first (existsSync/statSync/isFile guard)
+  const earlyReturnOld = /\.isFile\(\)\)return null/;
+  const earlyReturnMatchOld = funcBody.match(earlyReturnOld);
+
+  if (earlyReturnMatchOld && earlyReturnMatchOld.index !== undefined) {
+    const fallback = `if(!didReroute&&(${firstParam}.endsWith("/CLAUDE.md")||${firstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${firstParam}.slice(0,-9)+alt;if(${fsExpr}.existsSync(altPath)&&${fsExpr}.statSync(altPath).isFile())return ${functionName}(altPath,${restParams},true);}}`;
+
+    const earlyReturnStart = funcStart + earlyReturnMatchOld.index;
+    const oldStr = earlyReturnMatchOld[0];
+    const newStr = `.isFile()){${fallback}return null;}`;
+
+    newFile =
+      newFile.slice(0, earlyReturnStart) +
+      newStr +
+      newFile.slice(earlyReturnStart + oldStr.length);
+
+    showDiff(file, newFile, newStr, earlyReturnStart, earlyReturnStart);
+  } else {
+    // 2.1.70+: try/catch with ENOENT/EISDIR instead of isFile guard
+    const earlyReturnNew = /==="ENOENT"\|\|([$\w]+)==="EISDIR"\)return null;/;
+    const earlyReturnMatchNew = funcBody.match(earlyReturnNew);
+
+    if (!earlyReturnMatchNew || earlyReturnMatchNew.index === undefined) {
+      console.error(
+        'patch: agentsMd: failed to find early return null for injection'
+      );
+      return null;
+    }
+
+    // Recursive call — the function handles ENOENT gracefully
+    const fallback = `if(!didReroute&&(${firstParam}.endsWith("/CLAUDE.md")||${firstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${firstParam}.slice(0,-9)+alt;let r=${functionName}(altPath,${restParams},true);if(r)return r;}}`;
+
+    const earlyReturnStart = funcStart + earlyReturnMatchNew.index;
+    const oldStr = earlyReturnMatchNew[0];
+    const newStr = oldStr.replace(
+      ')return null;',
+      `){${fallback}return null;}`
     );
-    return null;
+
+    newFile =
+      newFile.slice(0, earlyReturnStart) +
+      newStr +
+      newFile.slice(earlyReturnStart + oldStr.length);
+
+    showDiff(file, newFile, newStr, earlyReturnStart, earlyReturnStart);
   }
-
-  const fallback = `if(!didReroute&&(${firstParam}.endsWith("/CLAUDE.md")||${firstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${firstParam}.slice(0,-9)+alt;if(${fsExpr}.existsSync(altPath)&&${fsExpr}.statSync(altPath).isFile())return ${functionName}(altPath,${restParams},true);}}`;
-
-  const earlyReturnStart = funcStart + earlyReturnMatch.index;
-  const oldStr = earlyReturnMatch[0];
-  const newStr = `.isFile()){${fallback}return null;}`;
-
-  newFile =
-    newFile.slice(0, earlyReturnStart) +
-    newStr +
-    newFile.slice(earlyReturnStart + oldStr.length);
-
-  showDiff(file, newFile, newStr, earlyReturnStart, earlyReturnStart);
 
   return newFile;
 };

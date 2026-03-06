@@ -32,27 +32,39 @@ export const findVersionOutputLocation = (
 
 /**
  * PATCH 2: Finds the location to insert tweakcc version in the header
+ *
+ * Pre-2.1.70 (contiguous):
+ *   createElement(TEXT,{bold:!0},"Claude Code")," ",createElement(TEXT,{dimColor:!0},"v",VER)
+ *
+ * 2.1.70+ (React Compiler cached):
+ *   createElement(TEXT,null,cachedBold," ",createElement(TEXT,{dimColor:!0},"v",VER))
  */
 const findTweakccVersionLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // Find Claude Code version display
-  const pattern =
+  // Pre-2.1.70: contiguous bold + dimColor pattern
+  const patOld =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
-    );
-    return null;
+  const matchOld = fileContents.match(patOld);
+  if (matchOld && matchOld.index !== undefined) {
+    const insertIndex = matchOld.index + matchOld[0].length;
+    return { startIndex: insertIndex, endIndex: insertIndex };
   }
 
-  // Insert right after this match
-  const insertIndex = match.index + match[0].length;
-  return {
-    startIndex: insertIndex,
-    endIndex: insertIndex,
-  };
+  // 2.1.70+: createElement(TEXT,null,VAR," ",createElement(TEXT,{dimColor:!0},"v",VAR))
+  const patNew =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,([$\w]+)," ",\1\.createElement\(\2,\{dimColor:!0\},"v",([$\w]+)\)\)/;
+  const matchNew = fileContents.match(patNew);
+  if (matchNew && matchNew.index !== undefined) {
+    // Insert before the last ) to add children to the outer createElement
+    const insertIndex = matchNew.index + matchNew[0].length - 1;
+    return { startIndex: insertIndex, endIndex: insertIndex };
+  }
+
+  console.error(
+    'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
+  );
+  return null;
 };
 
 /**
@@ -242,13 +254,17 @@ const applyIndicatorPatchesListPatch = (
 
 /**
  * PATCH 3: Finds the location to insert the patches applied list
+ *
+ * Uses createElement(TEXT,{bold:!0},"Claude Code") as anchor — simpler
+ * than the full version display pattern and unaffected by Patch 2's
+ * insertion (which modifies the dimColor version element downstream).
  */
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
+  // 1. Find the bold "Claude Code" element (works for both old and 2.1.70+)
   const pattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)/;
   const match = fileContents.match(pattern);
   if (!match || match.index === undefined) {
     console.error(
@@ -428,6 +444,8 @@ export const writePatchesAppliedIndication = (
   }
 
   // PATCH 4: Add tweakcc version to indicator view (if enabled)
+  // Non-fatal: React Compiler (2.1.70+) flattens createElement nesting,
+  // so the stack machine may fail. Header patches (1-3) still apply.
   let patch4ClosingParenIndex = -1;
   if (showTweakccVersion) {
     const patch4Result = applyIndicatorViewPatch(
@@ -438,33 +456,15 @@ export const writePatchesAppliedIndication = (
       textComponent,
       chalkVar
     );
-    if (!patch4Result) {
-      console.error('patch: patchesAppliedIndication: patch 4 failed');
-      return null;
+    if (patch4Result) {
+      content = patch4Result.content;
+      patch4ClosingParenIndex = patch4Result.closingParenIndex;
     }
-
-    content = patch4Result.content;
-    patch4ClosingParenIndex = patch4Result.closingParenIndex;
   }
 
   // PATCH 5: Add patches applied list to indicator view (if enabled)
-  if (showPatchesApplied) {
-    // If patch 4 wasn't applied, we need to find the insertion point
-    if (patch4ClosingParenIndex === -1) {
-      // Find alignItems:"center",minHeight:<value>, to use as reference point
-      const alignItemsPattern =
-        /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
-      const alignItemsMatch = content.match(alignItemsPattern);
-      if (!alignItemsMatch || alignItemsMatch.index === undefined) {
-        console.error(
-          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5'
-        );
-        return null;
-      }
-      patch4ClosingParenIndex =
-        alignItemsMatch.index + alignItemsMatch[0].length;
-    }
-
+  // Non-fatal: same React Compiler caveat as Patch 4.
+  if (showPatchesApplied && patch4ClosingParenIndex !== -1) {
     const finalContent = applyIndicatorPatchesListPatch(
       content,
       patch4ClosingParenIndex,
@@ -474,11 +474,9 @@ export const writePatchesAppliedIndication = (
       chalkVar,
       patchesApplies
     );
-    if (!finalContent) {
-      console.error('patch: patchesAppliedIndication: patch 5 failed');
-      return null;
+    if (finalContent) {
+      content = finalContent;
     }
-    content = finalContent;
   }
 
   return content;

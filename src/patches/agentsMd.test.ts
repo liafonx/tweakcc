@@ -15,10 +15,24 @@ const mockFunction =
   'n("tengu_claude_md_permission_error",{is_access_error:1});' +
   '}return null;}';
 
+// CC 2.1.70+: no existsSync/statSync/isFile guard, uses try/catch ENOENT
+const mockFunction270 =
+  'function lZR(T,_){try{' +
+  'let q=z_().readFileSync(T,{encoding:"utf-8"}),' +
+  'A=c1.extname(T).toLowerCase();' +
+  'if(A&&!Ia6.has(A))' +
+  'return L(`Skipping non-text file in @include: ${T}`),null;' +
+  'let{content:$,paths:H}=xa6(q),O=$;' +
+  'return{path:T,type:_,content:O,globs:H};' +
+  '}catch(R){let q=R.code;' +
+  'if(q==="ENOENT"||q==="EISDIR")return null;' +
+  'if(q==="EACCES")n("tengu_claude_md_permission_error",{is_access_error:1});' +
+  '}return null;}';
+
 const altNames = ['AGENTS.md', 'GEMINI.md', 'QWEN.md'];
 
 describe('agentsMd', () => {
-  describe('writeAgentsMd', () => {
+  describe('writeAgentsMd (pre-2.1.70)', () => {
     it('should inject fallback at early return null when CLAUDE.md is missing', () => {
       const result = writeAgentsMd(mockFunction, altNames);
       expect(result).not.toBeNull();
@@ -60,6 +74,40 @@ describe('agentsMd', () => {
     it('should return null when function pattern is not found', () => {
       const result = writeAgentsMd('not a valid file', altNames);
       expect(result).toBeNull();
+    });
+  });
+
+  describe('writeAgentsMd (CC 2.1.70+)', () => {
+    it('should inject fallback at ENOENT/EISDIR catch block', () => {
+      const result = writeAgentsMd(mockFunction270, altNames);
+      expect(result).not.toBeNull();
+      expect(result).toContain('didReroute');
+      expect(result).toContain('endsWith("/CLAUDE.md")');
+      expect(result).toContain('AGENTS.md');
+      expect(result).toMatch(/==="EISDIR"\)\{.*?return null;\}/);
+    });
+
+    it('should add didReroute parameter to function signature', () => {
+      const result = writeAgentsMd(mockFunction270, altNames)!;
+      expect(result).toContain('function lZR(T,_,didReroute)');
+    });
+
+    it('should use recursive call instead of existsSync', () => {
+      const result = writeAgentsMd(mockFunction270, altNames)!;
+      expect(result).toContain('let r=lZR(altPath,_,true)');
+      expect(result).toContain('if(r)return r');
+      // Should NOT use existsSync/statSync (no longer in function)
+      expect(result).not.toContain('existsSync(altPath)');
+    });
+
+    it('should preserve normal content path', () => {
+      const result = writeAgentsMd(mockFunction270, altNames)!;
+      expect(result).toContain('return{path:T,type:_,content:O,globs:H}');
+    });
+
+    it('should return null when no alternatives match', () => {
+      const result = writeAgentsMd(mockFunction270, altNames)!;
+      expect(result).toMatch(/\}return null;\}/);
     });
   });
 });
