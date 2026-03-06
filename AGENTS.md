@@ -96,6 +96,15 @@ cd /Users/liafo/Development/GitWorkspace/tweakcc && npm run build
 node dist/index.mjs --apply
 ```
 
+**Always `--restore` before `--apply`:**
+After `--apply` the live binary is patched. Running `--apply` again without restoring
+first causes every pattern to fail (they search an already-modified binary).
+
+```bash
+node dist/index.mjs --restore   # revert live binary to clean backup
+node dist/index.mjs --apply     # now apply to clean binary
+```
+
 **When to use `--restore` instead of reinstall:**
 `node dist/index.mjs --restore` reverts the live binary to `~/.tweakcc/native-binary.backup`.
 Use it only when the backup is still fresh (same CC version, no auto-update since last
