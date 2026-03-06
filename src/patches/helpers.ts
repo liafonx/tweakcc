@@ -292,11 +292,17 @@ export const clearCaches = (): void => {
  * Find the Text component variable name from Ink
  */
 export const findTextComponent = (fileContents: string): string | undefined => {
-  // Find the Text component function definition from Ink
-  // The minified Text component has this signature:
-  // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
+  // Find the Text component function definition from Ink.
+  //
+  // Pre-2.1.70: parameter destructuring
+  //   function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
+  //
+  // 2.1.70+ (React Compiler): body destructuring
+  //   function k(T){let _=Mj8.c(15),{color:R,backgroundColor:q,dimColor:A,...}=T
+  //
+  // Using {0,30} covers both: 2 chars before color in old style, ~22 in new style.
   const textComponentPattern =
-    /\bfunction ([$\w]+).{0,20}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
+    /\bfunction ([$\w]+).{0,30}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
   const match = fileContents.match(textComponentPattern);
   if (!match) {
     console.log('patch: findTextComponent: failed to find text component');
