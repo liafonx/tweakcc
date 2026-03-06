@@ -35,6 +35,20 @@ expression uniquely anchors to `nI` (diff view); `aI` (file viewer) is left unto
 original verbatim; `patchModelSelectorOptions` detects `wrapFn` dynamically via regex
 on `fullMatch` instead of a capture group (fixes wrapper semantics across CC versions).
 
+**`agentsMd`** — falls back from CLAUDE.md to AGENTS.md/GEMINI.md/QWEN.md when the former
+is absent. CC 2.1.70+ changed from `existsSync+statSync+isFile()` guard to a try/catch
+on ENOENT/EISDIR; the patch handles both patterns. In the 2.1.70+ path the recursive
+call is used directly (ENOENT is handled gracefully) instead of existsSync.
+
+**`patchesAppliedIndication`** — injects tweakcc version + patches-applied list into
+the startup header (Patches 1–3) and indicator view (Patches 4–5). CC 2.1.70's React
+Compiler caches createElement calls into variables with sentinel checks, breaking the
+paren-counting stack machine used by Patches 4–5; those two sub-patches are **non-fatal**
+in CC 2.1.70 (the header patches still apply). Patch 2 uses a backreference regex to
+match the cached `createElement(TEXT,null,VAR," ",createElement(TEXT,{dimColor:!0},"v",VER))`
+form; Patch 3 anchors on `createElement(TEXT,{bold:!0},"Claude Code")` (not affected by
+Patch 2's insertion).
+
 ## Development Commands
 
 ```bash
