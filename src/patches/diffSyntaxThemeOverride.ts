@@ -45,7 +45,7 @@ export const writeDiffSyntaxThemeOverride = (
   // Capture groups: 1=widthVar 2=rawWidthVar 3=extraVar 4=assignVar
   //                 5=moduleVar 6=themeVar 7=widthRef 8=dimVar
   const patNew =
-    /let ([$\w]+)=Math\.max\(1,Math\.floor\(([$\w]+)\)\),([$\w]+);if\((?:[^()]*(?:\([^()]*\))?)*\)([$\w]+)=([$\w]+)\.render\(([$\w]+),([$\w]+),([$\w]+)\)/;
+    /let ([$\w]+)=Math\.max\(1,Math\.floor\(([$\w]+)\)\),([$\w]+);if\((?:[^()]+|\([^()]*\))*\)([$\w]+)=([$\w]+)\.render\(([$\w]+),([$\w]+),([$\w]+)\)/;
 
   const matchNew = oldFile.match(patNew);
   if (matchNew && matchNew.index !== undefined) {
