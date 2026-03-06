@@ -4,7 +4,9 @@ import { Theme } from '../types';
 import { LocationResult, showDiff } from './index';
 
 // Built-in theme IDs that ship with Claude Code — leave their diff colors untouched.
-const BUILTIN_THEME_IDS = new Set([
+// Exported so other patches (e.g. diffSyntaxThemeOverride) can derive their own
+// forms (regex string, Set, etc.) from a single source of truth.
+export const BUILTIN_THEME_IDS = [
   'dark',
   'light',
   'dark-ansi',
@@ -12,7 +14,8 @@ const BUILTIN_THEME_IDS = new Set([
   'dark-daltonized',
   'light-daltonized',
   'monochrome',
-]);
+] as const;
+const BUILTIN_THEME_IDS_SET = new Set<string>(BUILTIN_THEME_IDS);
 
 // ANSI diff colors for dark-background custom themes.
 //
@@ -140,7 +143,7 @@ export const writeThemes = (
   // For custom (non-builtin) themes, override diff colors with ANSI values so
   // the Rust/bat renderer uses the terminal's own palette instead of rgb().
   const resolveColors = (theme: Theme): Theme['colors'] => {
-    if (BUILTIN_THEME_IDS.has(theme.id)) return theme.colors;
+    if (BUILTIN_THEME_IDS_SET.has(theme.id)) return theme.colors;
     return { ...theme.colors, ...CUSTOM_DARK_DIFF_COLORS };
   };
 
