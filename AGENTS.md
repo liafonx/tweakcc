@@ -19,6 +19,7 @@ Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc
 | `e8e6b1c` | fork-feature   | fix: update diffSyntaxThemeOverride and findTextComponent for CC 2.1.70          |
 | `9059293` | fork-fix       | fix: partition-safe regex for diffSyntaxThemeOverride if-block                   |
 | `a83e6ef` | fork-feature   | fix: update agentsMd and patchesAppliedIndication for CC 2.1.70                  |
+| `d9b5a5a` | fork-feature   | fix: update themes patch for CC 2.1.70 React Compiler output                     |
 
 Previously in upstream (PRs now merged): model customizations (#572), context-limit opt-in (#577).
 
@@ -34,6 +35,13 @@ expression uniquely anchors to `nI` (diff view); `aI` (file viewer) is left unto
 **`opusplan1m` fixes** — `patchDescriptionFunction` uses `fullMatch` to preserve the
 original verbatim; `patchModelSelectorOptions` detects `wrapFn` dynamically via regex
 on `fullMatch` instead of a capture group (fixes wrapper semantics across CC versions).
+
+**`themes`** — injects custom themes into the theme picker (`objArr`), the theme
+name-map (`obj`), and the color switch statement. CC 2.1.70 React Compiler changes:
+
+- `objArr`: array now prefixed with `[...[],` (sentinel-guarded cache entry)
+- `obj`: changed from `return{dark:"Dark",...}` to `{auto:"Auto...",dark:"Dark mode",...}[WT.value...]`;
+  the patch preserves the `auto:` entry and emits the full `{auto:..., ...themes}` object.
 
 **`agentsMd`** — falls back from CLAUDE.md to AGENTS.md/GEMINI.md/QWEN.md when the former
 is absent. CC 2.1.70+ changed from `existsSync+statSync+isFile()` guard to a try/catch
