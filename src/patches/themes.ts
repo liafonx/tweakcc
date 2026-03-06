@@ -54,10 +54,16 @@ function getThemesLocation(oldFile: string): {
     return null;
   }
 
-  const objArrPat = /\[(?:\{label:"(?:Dark|Light).+?",value:".+?"\},?)+\]/;
+  // CC 2.1.70+: array starts with [...[], prefix (React Compiler cache sentinel)
+  const objArrPat =
+    /\[(?:\.\.\.\[\],)?(?:\{label:"(?:Dark|Light).+?",value:".+?"\},?)+\]/;
+  // CC 2.1.70+: lookup object {auto:"Auto...",dark:"Dark mode",...}[WT.value...]
+  const objPatNew =
+    /\{auto:"[^"]+",(?:(?:[$\w]+|"[$\w-]+"): ?"[^"]+",?)+\}(?=\[)/;
   const objPat = /return\{(?:[$\w]+?:"(?:Dark|Light).+?",?)+\}/;
+
   const objArrMatch = oldFile.match(objArrPat);
-  const objMatch = oldFile.match(objPat);
+  const objMatch = oldFile.match(objPat) ?? oldFile.match(objPatNew);
 
   if (!objArrMatch || objArrMatch.index == undefined) {
     console.error('patch: themes: failed to find objArrMatch');
@@ -104,11 +110,27 @@ export const writeThemes = (
   // Process in reverse order to avoid index shifting
 
   // Update theme mapping object (obj)
-  const obj =
-    'return' +
-    JSON.stringify(
-      Object.fromEntries(themes.map(theme => [theme.id, theme.name]))
+  // CC 2.1.70+: {auto:"Auto...",dark:"Dark mode",...} — preserve the auto: entry
+  // Pre-2.1.70: return{dark:"Dark",...}
+  const existingObj = newFile.slice(
+    locations.obj.startIndex,
+    locations.obj.startIndex + 6
+  );
+  const themeEntries = Object.fromEntries(
+    themes.map(theme => [theme.id, theme.name])
+  );
+  let obj: string;
+  if (existingObj.startsWith('{')) {
+    const fullObjText = newFile.slice(
+      locations.obj.startIndex,
+      locations.obj.endIndex
     );
+    const autoMatch = fullObjText.match(/^\{auto:"([^"]+)"/);
+    const autoEntry = autoMatch ? `"auto":"${autoMatch[1]}",` : '';
+    obj = '{' + autoEntry + JSON.stringify(themeEntries).slice(1);
+  } else {
+    obj = 'return' + JSON.stringify(themeEntries);
+  }
   newFile =
     newFile.slice(0, locations.obj.startIndex) +
     obj +
