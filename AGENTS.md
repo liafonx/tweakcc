@@ -20,6 +20,7 @@ Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc
 | `9059293` | fork-fix       | fix: partition-safe regex for diffSyntaxThemeOverride if-block                   |
 | `a83e6ef` | fork-feature   | fix: update agentsMd and patchesAppliedIndication for CC 2.1.70                  |
 | `d9b5a5a` | fork-feature   | fix: update themes patch for CC 2.1.70 React Compiler output                     |
+| `b18b449` | fork-feature   | fix: update diffSyntaxThemeOverride for CC 2.1.71 render extraction              |
 
 Previously in upstream (PRs now merged): model customizations (#572), context-limit opt-in (#577).
 
@@ -27,10 +28,14 @@ Always rebase onto upstream — never merge: `git fetch upstream && git rebase u
 
 ## Fork-Specific Patches
 
-**`diff-syntax-theme-override`** — intercepts the theme ID before `J.render()` in the
-diff component's `useMemo`. Non-builtin IDs → `"dark-ansi"` → bat `ansi` theme →
-syntax highlighting preserved, no background fills. The `Math.max(1,Math.floor(...))`
-expression uniquely anchors to `nI` (diff view); `aI` (file viewer) is left untouched.
+**`diff-syntax-theme-override`** — intercepts the theme ID before the Rust ColorDiff
+`.render(themeId, width, dim)` call. Non-builtin IDs → `"dark-ansi"` → bat `ansi` theme →
+syntax highlighting preserved, no background fills. Three patterns across CC versions:
+
+- Pre-2.1.70: `let W=Math.max(1,Math.floor($));return J.render(q,W,A)` (inline, direct return)
+- 2.1.70: `let Z=Math.max(1,Math.floor(D)),N;if(R[6]!==J||...)N=J.render(h,Z,A)` (React Compiler cached)
+- 2.1.71+: render extracted to `Ns$` wrapper function; anchor is factory-call + null-guard
+  (backreference) + WeakMap cache-check + `new ClassVar(...).render(theme,width,dim)`
 
 **`opusplan1m` fixes** — `patchDescriptionFunction` uses `fullMatch` to preserve the
 original verbatim; `patchModelSelectorOptions` detects `wrapFn` dynamically via regex
