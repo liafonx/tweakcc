@@ -86,7 +86,9 @@ const patchPastSessions = (file: string): string | null => {
   }
 
   // Fall back to old pattern (CC ≤2.1.37): negative guard with early return
-  const oldPattern = /if\(![$\w]+\("tengu_coral_fern",!1\)\)return null;/;
+  // CC 2.1.72+ returns [] instead of null from this function
+  const oldPattern =
+    /if\(![$\w]+\("tengu_coral_fern",!1\)\)return(?:\[\]|null);/;
   const oldMatch = file.match(oldPattern);
 
   if (oldMatch && oldMatch.index !== undefined) {

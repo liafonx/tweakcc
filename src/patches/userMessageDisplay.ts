@@ -144,8 +144,12 @@ export const writeUserMessageDisplay = (
   // See the older examples above.  We explictly look for and match the component and subcomponent
   // that renders the ">" in older versions so that we can silently drop it in the replacement,
   // removing it in versions where it's present and not failing on versions where it's not.
+  // CC 2.1.72+: outer wrapper props grew to ~120 chars (added backgroundColor, paddingRight),
+  // so .{0,100} was too tight — increased to .{0,200}.
+  // CC 2.1.72+: inner component uses {text:T,useBriefLayout:O,timestamp:O?R:void 0},
+  // so the thinkingMetadata-specific alt is relaxed to (?:,[^}]+)? to match any extra props.
   const pattern =
-    /(No content found in user prompt message.{0,150}?\b)([$\w]+(?:\.default)?\.createElement.{0,30}\b[$\w]+(?:\.default)?\.createElement.{0,40}">.+?)?(([$\w]+(?:\.default)?\.createElement).{0,100})(\([$\w]+,(?:\{[^{}]+wrap:"wrap"\},([$\w]+)(?:\.trim\(\))?\)\)|\{text:([$\w]+)(?:,thinkingMetadata:[$\w]+)?\}\)\)?))/;
+    /(No content found in user prompt message.{0,150}?\b)([$\w]+(?:\.default)?\.createElement.{0,30}\b[$\w]+(?:\.default)?\.createElement.{0,40}">.+?)?(([$\w]+(?:\.default)?\.createElement).{0,200})(\([$\w]+,(?:\{[^{}]+wrap:"wrap"\},([$\w]+)(?:\.trim\(\))?\)\)|\{text:([$\w]+)(?:,[^}]+)?\}\)\)?))/;
 
   const match = oldFile.match(pattern);
 
