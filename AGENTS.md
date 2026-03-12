@@ -133,6 +133,25 @@ Useful to undo a patch without reinstalling, but only meaningful when the backup
 - Multiple unrelated patches fail simultaneously (patterns changed)
 - File sizes differ between live binary and backup
 
+tweakcc now auto-detects contaminated backups during startupCheck and skips re-backup.
+If you see a "live binary is already patched" warning, the ccVersion was stale — use
+`--import-settings` for gist pulls instead of overwriting config.json directly.
+
+### Config Safety — Gist Sync
+
+`config.json` contains both user preferences (`settings`) and machine-local state
+(`ccVersion`, `changesApplied`, `ccInstallationPath`). **Never overwrite `config.json`
+directly from a gist** — the stale `ccVersion` will cause `startupCheck` to re-backup
+the already-patched live binary, corrupting the backup.
+
+Use the safe sync commands instead:
+
+- `tweakcc --export-settings` — outputs only the `settings` portion (no machine state)
+- `tweakcc --import-settings <file|->` — merges imported settings, preserves machine state
+
+Defense-in-depth: `startupCheck` now detects if the live binary is already patched
+before re-backing up. If contamination is detected, it skips re-backup and warns.
+
 ## Theme System
 
 Config: `/Users/liafo/.tweakcc/config.json` → `.settings.themes[]` — **61 keys per theme**.
@@ -140,8 +159,10 @@ Config: `/Users/liafo/.tweakcc/config.json` → `.settings.themes[]` — **61 ke
 ### Gist Sync
 
 - Gist: https://gist.github.com/liafonx/5d7b8fa2baab5e870e1a9010f6470131
-- Push update: `gh gist edit 5d7b8fa2baab5e870e1a9010f6470131 -f config.json /Users/liafo/.tweakcc/config.json`
-- Pull latest: `gh gist view 5d7b8fa2baab5e870e1a9010f6470131 -r > /Users/liafo/.tweakcc/config.json`
+- Push settings to gist (settings only, no machine-local state):
+  `node dist/index.mjs --export-settings | gh gist edit 5d7b8fa2baab5e870e1a9010f6470131 -f settings.json`
+- Pull settings from gist (preserves local ccVersion, ccInstallationPath):
+  `gh gist view 5d7b8fa2baab5e870e1a9010f6470131 -r -f settings.json | node dist/index.mjs --import-settings -`
 
 ### Theme IDs In Scope
 

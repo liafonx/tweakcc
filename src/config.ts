@@ -434,3 +434,50 @@ export const fetchConfigFromUrl = async (
 
   return config;
 };
+
+export async function exportSettings(): Promise<string> {
+  const config = await readConfigFile();
+  return JSON.stringify(config.settings, null, 2);
+}
+
+export async function importSettings(input: string): Promise<void> {
+  // Strip non-JSON header lines (gist sometimes adds a filename header)
+  const lines = input.split('\n');
+  const jsonStartIndex = lines.findIndex(line =>
+    line.trimStart().startsWith('{')
+  );
+  if (jsonStartIndex === -1) {
+    throw new Error(
+      'No JSON object found in input. Expected a JSON object starting with {'
+    );
+  }
+  const jsonStr = lines.slice(jsonStartIndex).join('\n');
+
+  // Parse JSON
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse settings JSON: ${message}`);
+  }
+
+  // Detect shape: full TweakccConfig (has .settings) or bare Settings object
+  let importedSettings: Settings;
+  if (
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    'settings' in parsed &&
+    (parsed as Record<string, unknown>).settings !== null &&
+    typeof (parsed as Record<string, unknown>).settings === 'object'
+  ) {
+    importedSettings = (parsed as TweakccConfig).settings;
+  } else {
+    importedSettings = parsed as Settings;
+  }
+
+  await updateConfigFile(cfg => {
+    cfg.settings = importedSettings;
+    cfg.changesApplied = false;
+  });
+}

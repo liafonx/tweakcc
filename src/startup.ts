@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 
+import chalk from 'chalk';
 import {
   findClaudeCodeInstallation,
   getPendingCandidates,
@@ -11,6 +12,7 @@ import {
   CONFIG_FILE,
   NATIVE_BINARY_BACKUP_FILE,
   readConfigFile,
+  updateConfigFile,
 } from './config';
 import { debug } from './utils';
 import { displaySyncResults, syncSystemPrompts } from './systemPromptSync';
@@ -123,6 +125,37 @@ export async function completeStartupCheck(
 
     // Also backup native binary if version changed
     if (ccInstInfo.nativeInstallationPath && !hasBackedUpNativeBinary) {
+      // Guard: check if live binary is already patched before re-backing up.
+      // This prevents a contaminated backup when ccVersion was stale (e.g. from a gist pull).
+      const binaryContent = await fs.readFile(
+        ccInstInfo.nativeInstallationPath
+      );
+      if (binaryContent.includes('tweakcc')) {
+        console.warn(
+          chalk.yellow(
+            'Warning: live binary is already patched. Skipping re-backup.'
+          )
+        );
+        console.warn(
+          chalk.dim(
+            'This usually means ccVersion was stale (e.g. from a gist pull).'
+          )
+        );
+        console.warn(
+          chalk.dim(
+            'Use --import-settings instead of overwriting config.json directly.'
+          )
+        );
+        await updateConfigFile(cfg => {
+          cfg.ccVersion = realVersion;
+        });
+        return {
+          wasUpdated: false,
+          oldVersion: null,
+          newVersion: null,
+          ccInstInfo,
+        };
+      }
       debug(
         `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up native binary`
       );

@@ -9,6 +9,8 @@ import {
   readConfigFile,
   updateConfigFile,
   fetchConfigFromUrl,
+  exportSettings,
+  importSettings,
 } from './config';
 import {
   enableDebug,
@@ -45,6 +47,22 @@ import {
   restoreNativeBinaryFromBackup,
 } from './installationBackup';
 import { clearAllAppliedHashes } from './systemPromptHashIndex';
+
+// =============================================================================
+// Stdin Helper
+// =============================================================================
+
+async function readStdin(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', chunk => {
+      data += chunk;
+    });
+    process.stdin.on('end', () => resolve(data));
+    process.stdin.on('error', reject);
+  });
+}
 
 // =============================================================================
 // Invocation Command Detection
@@ -181,6 +199,11 @@ const main = async () => {
       '--config-url <url>',
       'fetch configuration from a URL instead of local config.json'
     )
+    .option('--export-settings', 'export settings to stdout (for gist sync)')
+    .option(
+      '--import-settings <file>',
+      'import settings from file or - for stdin'
+    )
     .action(async () => {
       // This action handles the default case (no subcommand).
       // All the --flag handling lives here so that Commander's subcommand
@@ -222,6 +245,45 @@ const main = async () => {
           options.listSystemPrompts as string | true
         );
         return;
+      }
+
+      // Handle --export-settings flag
+      if (options.exportSettings) {
+        try {
+          const settingsJson = await exportSettings();
+          process.stdout.write(settingsJson + '\n');
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error(chalk.red(`Error: ${message}`));
+          process.exit(1);
+        }
+        process.exit(0);
+      }
+
+      // Handle --import-settings flag
+      if (options.importSettings) {
+        try {
+          let content: string;
+          if (options.importSettings === '-') {
+            content = await readStdin();
+          } else {
+            const fsModule = await import('node:fs/promises');
+            content = await fsModule.default.readFile(
+              options.importSettings as string,
+              'utf8'
+            );
+          }
+          await importSettings(content);
+          console.log(chalk.green('Settings imported successfully.'));
+          console.log(chalk.dim('Run --apply to apply the imported settings.'));
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error(chalk.red(`Error: ${message}`));
+          process.exit(1);
+        }
+        process.exit(0);
       }
 
       // Handle --apply flag for non-interactive mode
