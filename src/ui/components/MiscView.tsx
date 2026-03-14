@@ -42,6 +42,12 @@ const TOKEN_ROUNDING_OPTIONS: (number | null)[] = [
   1000,
 ];
 
+// Context warning gap constraints
+const CONTEXT_WARNING_GAP_MIN = 1000;
+const CONTEXT_WARNING_GAP_MAX = 20000;
+const CONTEXT_WARNING_GAP_DEFAULT = 5000;
+const CONTEXT_WARNING_GAP_STEP = 1000;
+
 // Statusline throttle constraints
 const STATUSLINE_THROTTLE_MIN = 0;
 const STATUSLINE_THROTTLE_MAX = 1000;
@@ -82,6 +88,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
+    forceRemoteControlEnabled: false,
+    forceRemoteControlAtStartup: false,
+    contextWarningGapTokens: null as number | null,
   };
 
   const ensureMisc = () => {
@@ -127,6 +136,12 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     if (ms === null) return 'Disabled';
     if (ms === 0) return '0ms (instant)';
     return `${ms}ms`;
+  };
+
+  const getContextWarningGapDisplay = (gap: number | null): string => {
+    if (gap === null)
+      return `Default (${CONTEXT_WARNING_GAP_MAX / 1000}k = CC default)`;
+    return `${gap / 1000}k tokens (warning ~${Math.round((180000 - gap) / 2000)}% of 200k)`;
   };
 
   const getTokenRoundingDisplay = (value: number | null): string => {
@@ -610,6 +625,63 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.filterScrollEscapeSequences =
               !settings.misc!.filterScrollEscapeSequences;
+          });
+        },
+      },
+      {
+        id: 'contextWarningGapTokens',
+        title: 'Context low warning gap',
+        description: `Tokens before effective limit where "Context low" fires. Smaller = later warning. Default 20k fires at ~80% of 200k. Use ←/→ to adjust by 1k (${CONTEXT_WARNING_GAP_MIN / 1000}k–${CONTEXT_WARNING_GAP_MAX / 1000}k). Space to reset to default.`,
+        getValue: () => settings.misc?.contextWarningGapTokens ?? null,
+        getDisplayValue: () =>
+          getContextWarningGapDisplay(
+            settings.misc?.contextWarningGapTokens ?? null
+          ),
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.contextWarningGapTokens =
+              settings.misc!.contextWarningGapTokens === null
+                ? CONTEXT_WARNING_GAP_DEFAULT
+                : null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.contextWarningGapTokens ??
+              CONTEXT_WARNING_GAP_DEFAULT;
+            settings.misc!.contextWarningGapTokens = Math.min(
+              CONTEXT_WARNING_GAP_MAX,
+              current + CONTEXT_WARNING_GAP_STEP
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.contextWarningGapTokens ??
+              CONTEXT_WARNING_GAP_DEFAULT;
+            settings.misc!.contextWarningGapTokens = Math.max(
+              CONTEXT_WARNING_GAP_MIN,
+              current - CONTEXT_WARNING_GAP_STEP
+            );
+          });
+        },
+      },
+      {
+        id: 'forceRemoteControlAtStartup',
+        title: 'Auto-connect Remote Control at startup',
+        description:
+          'Automatically connect to Remote Control when CC starts. Requires OAuth credentials.',
+        getValue: () => settings.misc?.forceRemoteControlAtStartup ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.forceRemoteControlAtStartup =
+              !settings.misc!.forceRemoteControlAtStartup;
           });
         },
       },

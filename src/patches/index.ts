@@ -72,6 +72,15 @@ import { writeSuppressUpdateNotification } from './suppressUpdateNotification';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeDiffSyntaxThemeOverride } from './diffSyntaxThemeOverride';
+import { writeForceToolSearch } from './forceToolSearch';
+import { writeContextWarningThreshold } from './contextWarningThreshold';
+import {
+  writeForceRemoteControlEnabled,
+  writeBypassBridgeFeatureFlag,
+  writeBypassBridgeInitFeatureFlag,
+  writeBypassBridgeExplicitGating,
+  writeForceRemoteControlAtStartup,
+} from './forceRemoteControl';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -167,6 +176,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Custom themes use the ansi bat theme for diffs: syntax highlighting with no background fills',
+  },
+  {
+    id: 'force-tool-search',
+    name: 'Force Tool Search',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Bypass api.anthropic.com domain check to enable Tool Search with proxy/relay endpoints',
   },
   {
     id: 'fix-lsp-support',
@@ -371,6 +387,13 @@ const PATCH_DEFINITIONS = [
     description:
       'Filter out terminal escape sequences that cause unwanted scrolling',
   },
+  {
+    id: 'context-warning-threshold',
+    name: 'Context warning threshold',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Override the token gap before "Context low" fires (default 20000; reduces warning from 80% to a later point)',
+  },
   // Features
   {
     id: 'worktree-mode',
@@ -421,6 +444,20 @@ const PATCH_DEFINITIONS = [
     name: 'Conversation title',
     group: PatchGroup.FEATURES,
     description: '/title command will be created & enabled',
+  },
+  {
+    id: 'force-remote-control',
+    name: 'Force remote control enabled',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable the Remote Control settings toggle even when ANTHROPIC_AUTH_TOKEN is set, as long as local OAuth creds exist',
+  },
+  {
+    id: 'force-remote-control-at-startup',
+    name: 'Force remote control at startup',
+    group: PatchGroup.FEATURES,
+    description:
+      'Auto-enable remote control at startup (requires force-remote-control to be enabled)',
   },
 ] as const;
 
@@ -646,6 +683,9 @@ export const applyCustomization = async (
     'diff-syntax-theme-override': {
       fn: c => writeDiffSyntaxThemeOverride(c),
     },
+    'force-tool-search': {
+      fn: c => writeForceToolSearch(c),
+    },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),
     },
@@ -815,6 +855,14 @@ export const applyCustomization = async (
       fn: c => writeScrollEscapeSequenceFilter(c),
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
+    'context-warning-threshold': {
+      fn: c =>
+        writeContextWarningThreshold(
+          c,
+          config.settings.misc!.contextWarningGapTokens!
+        ),
+      condition: !!config.settings.misc?.contextWarningGapTokens,
+    },
     // Features
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
@@ -870,6 +918,23 @@ export const applyCustomization = async (
           ccInstInfo.version &&
           compareVersions(ccInstInfo.version, '2.0.64') < 0
         ),
+    },
+    'force-remote-control': {
+      fn: c => {
+        const r1 = writeForceRemoteControlEnabled(c);
+        if (!r1) return null;
+        // Patch 2 is best-effort: if the feature-flag guard is already absent, proceed
+        const r2 = writeBypassBridgeFeatureFlag(r1) ?? r1;
+        // Patch 4 is best-effort: removes the second independent Ql_() gate in initReplBridge
+        const r2b = writeBypassBridgeInitFeatureFlag(r2) ?? r2;
+        // Patch 5 is best-effort: removes replBridgeExplicit gating so indicator shows at startup
+        return writeBypassBridgeExplicitGating(r2b) ?? r2b;
+      },
+      condition: !!config.settings.misc?.forceRemoteControlEnabled,
+    },
+    'force-remote-control-at-startup': {
+      fn: c => writeForceRemoteControlAtStartup(c),
+      condition: !!config.settings.misc?.forceRemoteControlAtStartup,
     },
   };
 

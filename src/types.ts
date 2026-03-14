@@ -134,6 +134,9 @@ export interface MiscConfig {
   enableWorktreeMode: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
+  forceRemoteControlEnabled: boolean;
+  forceRemoteControlAtStartup: boolean;
+  contextWarningGapTokens: number | null;
 }
 
 export interface InputPatternHighlighter {
