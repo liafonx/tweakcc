@@ -136,7 +136,7 @@ export interface MiscConfig {
   enableModelCustomizations: boolean;
   forceRemoteControlEnabled: boolean;
   forceRemoteControlAtStartup: boolean;
-  contextWarningGapTokens: number | null;
+  suppressContextWarning: boolean;
 }
 
 export interface InputPatternHighlighter {

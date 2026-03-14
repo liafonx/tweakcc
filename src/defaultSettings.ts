@@ -718,7 +718,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableModelCustomizations: true,
     forceRemoteControlEnabled: true,
     forceRemoteControlAtStartup: false,
-    contextWarningGapTokens: null,
+    suppressContextWarning: false,
   },
   toolsets: [],
   defaultToolset: null,

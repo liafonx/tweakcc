@@ -233,6 +233,19 @@ const normalizeConfig = (config: TweakccConfig): void => {
   // In 3.2.6 hideCtrlGToEditPrompt was renamed to hideCtrlGToEdit.
   migrateHideCtrlGToEditPrompt(config);
 
+  // Migrate contextWarningGapTokens → suppressContextWarning (numeric stepper removed)
+  const tmpMisc = config.settings?.misc as
+    | (typeof config.settings.misc & {
+        contextWarningGapTokens?: number | null;
+      })
+    | undefined;
+  if (tmpMisc && 'contextWarningGapTokens' in tmpMisc) {
+    if (tmpMisc.contextWarningGapTokens != null) {
+      tmpMisc.suppressContextWarning = true;
+    }
+    delete tmpMisc.contextWarningGapTokens;
+  }
+
   // Remove launchText if it exists in the config; it was removed in v3.0.0.
   delete (config.settings as Settings & { launchText: unknown }).launchText;
 };

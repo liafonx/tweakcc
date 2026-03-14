@@ -11,16 +11,20 @@ Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc
 
 ## Fork Commits (must survive upstream rebases)
 
-| Commit    | Status         | Description                                                                      |
-| --------- | -------------- | -------------------------------------------------------------------------------- |
-| `55b4453` | fork-permanent | feat: replace Rust diff renderer bypass with theme ID override                   |
-| `0017699` | fork-local     | chore: re-add UNKNOWN\_\* fallback to fork main for local use (not for upstream) |
-| `76c2122` | fork-feature   | feat: add suppress-update-notification patch                                     |
-| `e8e6b1c` | fork-feature   | fix: update diffSyntaxThemeOverride and findTextComponent for CC 2.1.70          |
-| `9059293` | fork-fix       | fix: partition-safe regex for diffSyntaxThemeOverride if-block                   |
-| `a83e6ef` | fork-feature   | fix: update agentsMd and patchesAppliedIndication for CC 2.1.70                  |
-| `d9b5a5a` | fork-feature   | fix: update themes patch for CC 2.1.70 React Compiler output                     |
-| `b18b449` | fork-feature   | fix: update diffSyntaxThemeOverride for CC 2.1.71 render extraction              |
+| Commit    | Status         | Description                                                                                   |
+| --------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `55b4453` | fork-permanent | feat: replace Rust diff renderer bypass with theme ID override                                |
+| `0017699` | fork-local     | chore: re-add UNKNOWN\_\* fallback to fork main for local use (not for upstream)              |
+| `76c2122` | fork-feature   | feat: add suppress-update-notification patch                                                  |
+| `e8e6b1c` | fork-feature   | fix: update diffSyntaxThemeOverride and findTextComponent for CC 2.1.70                       |
+| `9059293` | fork-fix       | fix: partition-safe regex for diffSyntaxThemeOverride if-block                                |
+| `a83e6ef` | fork-feature   | fix: update agentsMd and patchesAppliedIndication for CC 2.1.70                               |
+| `d9b5a5a` | fork-feature   | fix: update themes patch for CC 2.1.70 React Compiler output                                  |
+| `b18b449` | fork-feature   | fix: update diffSyntaxThemeOverride for CC 2.1.71 render extraction                           |
+| `8896338` | fork-fix       | fix: update sessionMemory and userMessageDisplay patches for CC 2.1.72 compatibility          |
+| `927730d` | fork-feature   | feat: add safe gist sync (--export-settings/--import-settings) and backup contamination guard |
+| `2628139` | fork-feature   | feat: add remote control and context warning gap settings                                     |
+| pending   | fork-fix       | fix: remove opusplan1m patch (1M context now default in CC 2.1.75)                            |
 
 Previously in upstream (PRs now merged): model customizations (#572), context-limit opt-in (#577).
 
@@ -62,6 +66,30 @@ match the cached `createElement(TEXT,null,VAR," ",createElement(TEXT,{dimColor:!
 form; Patch 3 anchors on `createElement(TEXT,{bold:!0},"Claude Code")` (not affected by
 Patch 2's insertion).
 
+**`forceRemoteControl`** — 5 sub-patches that unlock Remote Control for non-OAuth users:
+
+- Patch 1: Override the feature-flag helper (anchored by `"tengu_ccr_bridge",!1`) to
+  unconditionally `return true`, making the settings toggle visible.
+- Patch 2: Remove the `if(!await Ql_())return"Remote Control is not enabled..."` guard
+  in `blK()` (bridge preflight). Credential check (`D6()?.accessToken`) still enforces
+  valid local OAuth creds.
+- Patch 3 (optional): Flip `remoteControlAtStartup` default `!1` → `!0`, applied only
+  when `forceRemoteControlAtStartup` is enabled in config.
+- Patch 4: Remove the `Ql_()` guard in `y6$()` (`initReplBridge`) that logs
+  `"[bridge:repl] Skipping: bridge not enabled"` and returns null.
+- Patch 5: Remove the `replBridgeExplicit` gating in the status indicator (`U4$`) that
+  hides the indicator when the bridge was auto-started (not user-explicit).
+- Patches 2, 4, and 5 are best-effort (non-fatal if guard already absent).
+
+**`contextWarningThreshold`** — suppresses the "Context low" warning by setting the
+gap constant to 0 (warning would only fire at 100% usage). Anchored by the adjacent
+`13000` constant in the var declaration block (`var ...,vZq=13000,hrR=20000,...`).
+Enabled via `suppressContextWarning` boolean toggle in misc settings.
+
+**`forceToolSearch`** — bypasses the `api.anthropic.com` domain check that gates Tool
+Search, replacing `return["api.anthropic.com"].includes(host)}catch{return!1}` with
+`return!0}catch{return!0}`. Enables Tool Search when using proxy or relay endpoints.
+
 ## Development Commands
 
 ```bash
@@ -82,11 +110,15 @@ src/
     helpers.ts                   # Shared utilities: findChalkVar, getReactVar, etc.
     themes.ts                    # Theme injection (incl. diff color overrides)
     diffSyntaxThemeOverride.ts   # Fork: Rust renderer theme ID swap
-    opusplan1m.ts                # Fork: model alias support
     modelSelector.ts             # Fork: CUSTOM_MODELS injection
+    forceRemoteControl.ts        # Fork: unlock Remote Control for non-OAuth
+    contextWarningThreshold.ts   # Fork: context warning gap override
+    forceToolSearch.ts           # Fork: bypass domain check for Tool Search
   tests/                         # Vitest: config, migration, systemPromptSync, etc.
   ui/                            # Ink/React terminal UI (theme editor, color picker)
   config.ts                      # ~/.tweakcc/ config read/write
+  defaultSettings.ts             # Default settings values and merging
+  startup.ts                     # startupCheck: version detect, backup guard, contamination check
   types.ts                       # Theme (61 color keys), Settings, TweakccConfig
 ```
 
@@ -147,7 +179,29 @@ the already-patched live binary, corrupting the backup.
 Use the safe sync commands instead:
 
 - `tweakcc --export-settings` — outputs only the `settings` portion (no machine state)
-- `tweakcc --import-settings <file|->` — merges imported settings, preserves machine state
+- `tweakcc --import-settings <file|->` — **full replacement** of `cfg.settings`; preserves
+  machine-local state (`ccVersion` etc.) but overwrites every settings field.
+  **Never pipe partial JSON** (e.g. `echo '{"misc":{...}}'`) — it replaces the entire
+  settings object with only that fragment, wiping everything else. Use `jq` for individual
+  field edits instead (see below).
+
+The gist file (`config.json`) stores the full `TweakccConfig` shape (with a `settings` key);
+`--import-settings` detects this and extracts `.settings` automatically.
+
+**To set a single field after a gist pull**, edit `~/.tweakcc/config.json` directly with jq:
+
+```bash
+jq '.settings.misc.suppressContextWarning = true' ~/.tweakcc/config.json > /tmp/cfg.json \
+  && mv /tmp/cfg.json ~/.tweakcc/config.json
+```
+
+**To recover lost settings from gist git history:**
+
+```bash
+git clone https://gist.github.com/5d7b8fa2baab5e870e1a9010f6470131.git /tmp/gist-tweakcc
+git -C /tmp/gist-tweakcc log --oneline          # find the right commit
+git -C /tmp/gist-tweakcc show <sha>:config.json | jq '.settings.<field>'
+```
 
 Defense-in-depth: `startupCheck` now detects if the live binary is already patched
 before re-backing up. If contamination is detected, it skips re-backup and warns.
@@ -160,9 +214,10 @@ Config: `/Users/liafo/.tweakcc/config.json` → `.settings.themes[]` — **61 ke
 
 - Gist: https://gist.github.com/liafonx/5d7b8fa2baab5e870e1a9010f6470131
 - Push settings to gist (settings only, no machine-local state):
-  `node dist/index.mjs --export-settings | gh gist edit 5d7b8fa2baab5e870e1a9010f6470131 -f settings.json`
-- Pull settings from gist (preserves local ccVersion, ccInstallationPath):
-  `gh gist view 5d7b8fa2baab5e870e1a9010f6470131 -r -f settings.json | node dist/index.mjs --import-settings -`
+  `node dist/index.mjs --export-settings | gh gist edit 5d7b8fa2baab5e870e1a9010f6470131 -f config.json`
+- Pull settings from gist (full replacement of settings, preserves local ccVersion/ccInstallationPath):
+  `gh gist view 5d7b8fa2baab5e870e1a9010f6470131 -r -f config.json | node dist/index.mjs --import-settings -`
+- After pulling, set individual fields with jq rather than a second `--import-settings` call
 
 ### Theme IDs In Scope
 

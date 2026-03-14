@@ -43,7 +43,6 @@ import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
-import { writeOpusplan1m } from './opusplan1m';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
@@ -156,13 +155,6 @@ const PATCH_DEFINITIONS = [
     name: 'Verbose property',
     group: PatchGroup.ALWAYS_APPLIED,
     description: 'Token counter will show (2s · ↓ 169 tokens · thinking)',
-  },
-  {
-    id: 'opusplan1m',
-    name: 'Opusplan[1m] support',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description:
-      'Use the "Opus Plan 1M" model: Opus for planning, Sonnet 1M context for building',
   },
   {
     id: 'thinking-block-styling',
@@ -389,10 +381,10 @@ const PATCH_DEFINITIONS = [
   },
   {
     id: 'context-warning-threshold',
-    name: 'Context warning threshold',
+    name: 'Suppress context warning',
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
-      'Override the token gap before "Context low" fires (default 20000; reduces warning from 80% to a later point)',
+      'Suppress the "Context low" warning by setting the gap constant to 0 (warning only fires at 100% usage)',
   },
   // Features
   {
@@ -671,9 +663,6 @@ export const applyCustomization = async (
       fn: c => writeContextLimit(c),
       condition: !!config.settings.misc?.enableContextLimitOverride,
     },
-    opusplan1m: {
-      fn: c => writeOpusplan1m(c),
-    },
     'thinking-block-styling': {
       fn: c => writeThinkingBlockStyling(c),
       condition:
@@ -856,12 +845,8 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
     'context-warning-threshold': {
-      fn: c =>
-        writeContextWarningThreshold(
-          c,
-          config.settings.misc!.contextWarningGapTokens!
-        ),
-      condition: !!config.settings.misc?.contextWarningGapTokens,
+      fn: c => writeContextWarningThreshold(c),
+      condition: !!config.settings.misc?.suppressContextWarning,
     },
     // Features
     'worktree-mode': {
