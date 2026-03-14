@@ -122,6 +122,69 @@ src/
   types.ts                       # Theme (61 color keys), Settings, TweakccConfig
 ```
 
+## New CC Version Update Checklist
+
+When CC auto-updates or a new version is released, run this full sequence:
+
+```bash
+# 1. Upgrade CC (or use brew reinstall claude-code for a clean binary)
+brew upgrade claude-code
+
+# 2. Update the backup to the new binary
+cp "$(ls -d /opt/homebrew/Caskroom/claude-code/*/claude | tail -1)" ~/.tweakcc/native-binary.backup
+
+# 3. Rebuild the fork (always after a version bump)
+cd /Users/liafo/Development/GitWorkspace/tweakcc && npm run build
+
+# 4. Apply and check patch output — every patch must show ✓
+node dist/index.mjs --apply
+```
+
+### Verify patches after apply
+
+Check the apply output carefully:
+
+- Every patch you care about must show `✓` — any `✗` or `failed` requires a fix
+- `patchesAppliedIndication` PATCH 5 is permanently non-fatal (React Compiler since 2.1.70)
+- "Could not find system prompt X" warnings are soft-fails; benign if you haven't customized that file
+- "Themes" patch must appear and be `✓` — if missing, config reverted to defaults (recover from gist)
+
+### Cache cleanup after a version bump
+
+Delete the old version's prompt cache (keeps only current):
+
+```bash
+# Delete old version cache (replace OLD_VER with the previous version number)
+rm ~/.tweakcc/prompt-data-cache/prompts-<OLD_VER>.json
+```
+
+Delete stale system prompt files whose `ccVersion` frontmatter no longer matches:
+
+- If a prompt file shows "Could not find system prompt X" on --apply AND you haven't
+  customized it, it has a stale regex. Delete it — tweakcc will re-sync it from the binary:
+
+```bash
+# Example: delete a stale skill prompt
+rm ~/.tweakcc/system-prompts/skill-stuck-slash-command.md
+# Then re-apply so tweakcc re-syncs the file from the new binary
+node dist/index.mjs --apply
+```
+
+Note: tweakcc auto-recreates any file it can extract from the binary during sync.
+The "Could not find" error persists even after deletion+re-apply for prompts whose
+binary anchor regex doesn't match — this is benign if the file is unmodified.
+
+### Config safety after update
+
+After upgrading CC, verify themes weren't reverted:
+
+```bash
+cat ~/.tweakcc/config.json | python3 -c "import json,sys; c=json.load(sys.stdin); print(len(c['settings']['themes']), 'themes')"
+# Expected: 19 (or however many you have). If it shows 7, restore from gist:
+gh gist view 5d7b8fa2baab5e870e1a9010f6470131 -r -f config.json | node dist/index.mjs --import-settings -
+node dist/index.mjs --apply
+```
+
 ## Restore / Cache-Clean / Re-apply
 
 Run this sequence whenever patches fail (binary auto-updated, backup stale, or
