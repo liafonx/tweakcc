@@ -26,6 +26,8 @@ export function ThemesView({ onBack }: ThemesViewProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
   const [inputActive, setInputActive] = useState(true);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleCreateTheme = () => {
     const baseTheme = themes[0] || DEFAULT_SETTINGS.themes[0];
@@ -53,6 +55,7 @@ export function ThemesView({ onBack }: ThemesViewProps) {
     if (selectedIndex >= themes.length - 1) {
       setSelectedIndex(Math.max(0, themes.length - 2));
     }
+    setConfirmDeleteId(null);
   };
 
   const handleResetThemes = () => {
@@ -60,10 +63,27 @@ export function ThemesView({ onBack }: ThemesViewProps) {
       settings.themes = [...DEFAULT_SETTINGS.themes]; // Copy to avoid mutation later.
     });
     setSelectedIndex(0);
+    setConfirmReset(false);
   };
 
   useInput(
     (input, key) => {
+      if (confirmReset) {
+        if (input === 'y') {
+          handleResetThemes();
+        } else {
+          setConfirmReset(false);
+        }
+        return;
+      }
+      if (confirmDeleteId !== null) {
+        if (input === 'y') {
+          handleDeleteTheme(confirmDeleteId);
+        } else {
+          setConfirmDeleteId(null);
+        }
+        return;
+      }
       if (key.escape) {
         onBack();
       } else if (key.upArrow) {
@@ -81,10 +101,10 @@ export function ThemesView({ onBack }: ThemesViewProps) {
       } else if (input === 'd') {
         const selectedTheme = themes[selectedIndex];
         if (selectedTheme) {
-          handleDeleteTheme(selectedTheme.id);
+          setConfirmDeleteId(selectedTheme.id);
         }
       } else if (key.ctrl && input === 'r') {
-        handleResetThemes();
+        setConfirmReset(true);
       }
     },
     { isActive: inputActive }
@@ -118,7 +138,7 @@ export function ThemesView({ onBack }: ThemesViewProps) {
             <Text dimColor>n to create a new theme</Text>
             <Text dimColor>esc to go back</Text>
           </Box>
-          <Text>No themes available!</Text>
+          <Text>No themes available! Press n to create one.</Text>
         </Box>
       </Box>
     );
@@ -134,6 +154,20 @@ export function ThemesView({ onBack }: ThemesViewProps) {
           <Text dimColor>ctrl+r to delete all themes and restore built-in</Text>
           <Text dimColor>enter to edit theme</Text>
           <Text dimColor>esc to go back</Text>
+          {confirmDeleteId !== null && (
+            <Text color="yellow" bold>
+              Delete &quot;
+              {themes.find(t => t.id === confirmDeleteId)?.name ??
+                confirmDeleteId}
+              &quot;? Press y to confirm, any other key to cancel.
+            </Text>
+          )}
+          {confirmReset && (
+            <Text color="red" bold>
+              Reset ALL themes to built-in defaults? Press y to confirm, any
+              other key to cancel.
+            </Text>
+          )}
         </Box>
 
         <Box flexDirection="column">
