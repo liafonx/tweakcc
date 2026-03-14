@@ -177,6 +177,15 @@ describe('writeForceRemoteControlAtStartup', () => {
     expect(result).toContain('!==void 0)return _');
   });
 
+  it('matches the CC 2.1.76 let-prefixed accessor form', () => {
+    const result = writeForceRemoteControlAtStartup(
+      `let _=DT().remoteControlAtStartup;if(_!==void 0)return _;return!1}`
+    );
+    expect(result).not.toBeNull();
+    expect(result).toContain('let _=DT().remoteControlAtStartup');
+    expect(result).toContain('return!0}');
+  });
+
   it('returns null when pattern is absent', () => {
     const result = writeForceRemoteControlAtStartup(
       'var x=fT().remoteControlAtStartup;return!1'

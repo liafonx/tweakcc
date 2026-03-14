@@ -110,13 +110,13 @@ export function writeBypassBridgeExplicitGating(
  * Patch 3 (optional): Flip the remoteControlAtStartup default from false → true.
  *
  * Only applied when forceRemoteControlAtStartup is enabled in config.
- * Anchored on fT().remoteControlAtStartup with the surrounding void-0 guard.
+ * Anchored on the remoteControlAtStartup property with the surrounding void-0 guard.
  */
 export function writeForceRemoteControlAtStartup(
   oldFile: string
 ): string | null {
   const pattern =
-    /(fT\(\)\.remoteControlAtStartup;if\([$\w]+!==void 0\)return [$\w]+;return)!1(\})/;
+    /((?:let [$\w]+=)?[$\w]+\(\)\.remoteControlAtStartup;if\([$\w]+!==void 0\)return [$\w]+;return)!1(\})/;
   if (!pattern.test(oldFile)) {
     console.error(
       'patch: forceRemoteControl: failed to find remoteControlAtStartup default'

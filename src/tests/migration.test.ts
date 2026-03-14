@@ -1,7 +1,41 @@
+import { describe, it, vi, expect } from 'vitest';
+
+// ====== Module mocks (hoisted by vitest) ======
+
+vi.mock('node:fs/promises', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises'
+    );
+  const mocked = {
+    ...actual,
+    readFile: vi.fn(),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue({}),
+    unlink: vi.fn().mockResolvedValue(undefined),
+  };
+  return { ...mocked, default: mocked };
+});
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    default: { ...actual, existsSync: vi.fn().mockReturnValue(true) },
+    existsSync: vi.fn().mockReturnValue(true),
+  };
+});
+
+vi.mock('../systemPromptHashIndex', () => ({
+  hasUnappliedSystemPromptChanges: vi.fn().mockResolvedValue(false),
+}));
+
+// ====== Imports (after mocks) ======
+
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { describe, it, vi, expect } from 'vitest';
 import { DEFAULT_SETTINGS } from '../defaultSettings';
 import { readConfigFile } from '../config';
 import { migrateConfigIfNeeded } from '../migration';
