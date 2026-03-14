@@ -24,7 +24,7 @@ Guidelines for agents working in **liafonx/tweakcc** (fork of Piebald-AI/tweakcc
 | `8896338` | fork-fix       | fix: update sessionMemory and userMessageDisplay patches for CC 2.1.72 compatibility          |
 | `927730d` | fork-feature   | feat: add safe gist sync (--export-settings/--import-settings) and backup contamination guard |
 | `2628139` | fork-feature   | feat: add remote control and context warning gap settings                                     |
-| pending   | fork-fix       | fix: remove opusplan1m patch (1M context now default in CC 2.1.75)                            |
+| `3668c3a` | fork-fix       | fix: update for CC 2.1.75 — remove opusplan1m, rename contextWarning setting                  |
 
 Previously in upstream (PRs now merged): model customizations (#572), context-limit opt-in (#577).
 
