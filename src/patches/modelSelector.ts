@@ -21,7 +21,7 @@ export const CUSTOM_MODELS: { value: string; label: string; description: string 
   { value: 'claude-3-opus-20240229',      label: 'Opus 3',               description: "Claude 3 Opus (February 2024)" },
 ];
 
-const findCustomModelListInsertionPoint = (
+export const findCustomModelListInsertionPoint = (
   fileContents: string
 ): { insertionIndex: number; modelListVar: string } | null => {
   // 1. Find the custom model push pattern
@@ -77,6 +77,24 @@ export const writeModelCustomizations = (oldFile: string): string | null => {
   const inject = CUSTOM_MODELS.map(
     model => `${modelListVar}.push(${JSON.stringify(model)});`
   ).join('');
+
+  const newFile =
+    oldFile.slice(0, insertionIndex) + inject + oldFile.slice(insertionIndex);
+  showDiff(oldFile, newFile, inject, insertionIndex, insertionIndex);
+  return newFile;
+};
+
+export const writeOpusPlanModel = (oldFile: string): string | null => {
+  const found = findCustomModelListInsertionPoint(oldFile);
+  if (!found) return null;
+
+  const { insertionIndex, modelListVar } = found;
+  const model = {
+    value: 'opusplan',
+    label: 'Opus Plan',
+    description: 'Opus for planning, Sonnet for execution',
+  };
+  const inject = `${modelListVar}.push(${JSON.stringify(model)});`;
 
   const newFile =
     oldFile.slice(0, insertionIndex) + inject + oldFile.slice(insertionIndex);

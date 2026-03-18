@@ -42,7 +42,7 @@ import { writeThinkingVerbs } from './thinkingVerbs';
 import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
-import { writeModelCustomizations } from './modelSelector';
+import { writeModelCustomizations, writeOpusPlanModel } from './modelSelector';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
@@ -73,13 +73,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeDiffSyntaxThemeOverride } from './diffSyntaxThemeOverride';
 import { writeForceToolSearch } from './forceToolSearch';
 import { writeContextWarningThreshold } from './contextWarningThreshold';
-import {
-  writeForceRemoteControlEnabled,
-  writeBypassBridgeFeatureFlag,
-  writeBypassBridgeInitFeatureFlag,
-  writeBypassBridgeExplicitGating,
-  writeForceRemoteControlAtStartup,
-} from './forceRemoteControl';
+import { writeForceMaxSubscription } from './forceMaxSubscription';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -187,6 +181,13 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'opus-plan-model',
+    name: 'Opus Plan model',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Add opusplan (Opus for planning, Sonnet for execution) to the /model dropdown',
   },
   // Misc Configurable
   {
@@ -438,18 +439,11 @@ const PATCH_DEFINITIONS = [
     description: '/title command will be created & enabled',
   },
   {
-    id: 'force-remote-control',
-    name: 'Force remote control enabled',
+    id: 'force-max-subscription',
+    name: 'Force Max subscription mode',
     group: PatchGroup.FEATURES,
     description:
-      'Enable the Remote Control settings toggle even when ANTHROPIC_AUTH_TOKEN is set, as long as local OAuth creds exist',
-  },
-  {
-    id: 'force-remote-control-at-startup',
-    name: 'Force remote control at startup',
-    group: PatchGroup.FEATURES,
-    description:
-      'Auto-enable remote control at startup (requires force-remote-control to be enabled)',
+      'Treat API-key users as Max subscribers (model list, defaults, feature gates).',
   },
 ] as const;
 
@@ -620,19 +614,22 @@ export const applyCustomization = async (
   // ==========================================================================
   // Apply system prompt customizations (has its own result format)
   // ==========================================================================
-  const systemPromptsResult = await applySystemPrompts(
-    content,
-    ccInstInfo.version,
-    undefined, // escapeNonAscii - auto-detect
-    patchFilter
-  );
-  content = systemPromptsResult.newContent;
+  let sortedSystemPromptResults: PatchResult[] = [];
+  if (config.settings.misc?.enableSystemPromptCustomization) {
+    const systemPromptsResult = await applySystemPrompts(
+      content,
+      ccInstInfo.version,
+      undefined, // escapeNonAscii - auto-detect
+      patchFilter
+    );
+    content = systemPromptsResult.newContent;
 
-  // Sort system prompt results alphabetically by name before adding
-  const sortedSystemPromptResults = [...systemPromptsResult.results].sort(
-    (a, b) => a.name.localeCompare(b.name)
-  );
-  allResults.push(...sortedSystemPromptResults);
+    // Sort system prompt results alphabetically by name before adding
+    sortedSystemPromptResults = [...systemPromptsResult.results].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+    allResults.push(...sortedSystemPromptResults);
+  }
 
   // Legacy items array for patchesAppliedIndication (backward compatibility)
   // Escape ANSI codes so they render properly when injected into cli.js
@@ -686,6 +683,9 @@ export const applyCustomization = async (
           config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
+    },
+    'opus-plan-model': {
+      fn: c => writeOpusPlanModel(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
@@ -904,22 +904,9 @@ export const applyCustomization = async (
           compareVersions(ccInstInfo.version, '2.0.64') < 0
         ),
     },
-    'force-remote-control': {
-      fn: c => {
-        const r1 = writeForceRemoteControlEnabled(c);
-        if (!r1) return null;
-        // Patch 2 is best-effort: if the feature-flag guard is already absent, proceed
-        const r2 = writeBypassBridgeFeatureFlag(r1) ?? r1;
-        // Patch 4 is best-effort: removes the second independent Ql_() gate in initReplBridge
-        const r2b = writeBypassBridgeInitFeatureFlag(r2) ?? r2;
-        // Patch 5 is best-effort: removes replBridgeExplicit gating so indicator shows at startup
-        return writeBypassBridgeExplicitGating(r2b) ?? r2b;
-      },
-      condition: !!config.settings.misc?.forceRemoteControlEnabled,
-    },
-    'force-remote-control-at-startup': {
-      fn: c => writeForceRemoteControlAtStartup(c),
-      condition: !!config.settings.misc?.forceRemoteControlAtStartup,
+    'force-max-subscription': {
+      fn: c => writeForceMaxSubscription(c),
+      condition: !!config.settings.misc?.forceMaxSubscription,
     },
   };
 

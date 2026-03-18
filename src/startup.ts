@@ -75,13 +75,15 @@ export async function completeStartupCheck(
   }
 
   // Sync system prompts with the current CC version
-  if (ccInstInfo.version) {
-    try {
-      const syncSummary = await syncSystemPrompts(ccInstInfo.version);
-      displaySyncResults(syncSummary);
-    } catch {
-      // Error already logged with chalk.red in syncSystemPrompts
-      // Continue with startup check even if prompt sync fails
+  if (config.settings.misc?.enableSystemPromptCustomization) {
+    if (ccInstInfo.version) {
+      try {
+        const syncSummary = await syncSystemPrompts(ccInstInfo.version);
+        displaySyncResults(syncSummary);
+      } catch {
+        // Error already logged with chalk.red in syncSystemPrompts
+        // Continue with startup check even if prompt sync fails
+      }
     }
   }
 

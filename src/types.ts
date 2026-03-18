@@ -134,9 +134,9 @@ export interface MiscConfig {
   enableWorktreeMode: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
-  forceRemoteControlEnabled: boolean;
-  forceRemoteControlAtStartup: boolean;
   suppressContextWarning: boolean;
+  forceMaxSubscription: boolean;
+  enableSystemPromptCustomization: boolean;
 }
 
 export interface InputPatternHighlighter {

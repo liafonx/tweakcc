@@ -66,20 +66,12 @@ match the cached `createElement(TEXT,null,VAR," ",createElement(TEXT,{dimColor:!
 form; Patch 3 anchors on `createElement(TEXT,{bold:!0},"Claude Code")` (not affected by
 Patch 2's insertion).
 
-**`forceRemoteControl`** — 5 sub-patches that unlock Remote Control for non-OAuth users:
-
-- Patch 1: Override the feature-flag helper (anchored by `"tengu_ccr_bridge",!1`) to
-  unconditionally `return true`, making the settings toggle visible.
-- Patch 2: Remove the `if(!await Ql_())return"Remote Control is not enabled..."` guard
-  in `blK()` (bridge preflight). Credential check (`D6()?.accessToken`) still enforces
-  valid local OAuth creds.
-- Patch 3 (optional): Flip `remoteControlAtStartup` default `!1` → `!0`, applied only
-  when `forceRemoteControlAtStartup` is enabled in config.
-- Patch 4: Remove the `Ql_()` guard in `y6$()` (`initReplBridge`) that logs
-  `"[bridge:repl] Skipping: bridge not enabled"` and returns null.
-- Patch 5: Remove the `replBridgeExplicit` gating in the status indicator (`U4$`) that
-  hides the indicator when the bridge was auto-started (not user-explicit).
-- Patches 2, 4, and 5 are best-effort (non-fatal if guard already absent).
+**`forceMaxSubscription`** — forces CC to treat an API-key user as a Max subscriber
+across the entire app (model list, defaults, feature gates), while preserving API-key
+authentication to the proxy. Designed for sub2api setups. Groups A–D cover subscription
+override, auth protection, resilience, and telemetry (see JSDoc in
+`src/patches/forceMaxSubscription.ts` for full sub-patch list). Enabled via
+`forceMaxSubscription` boolean toggle in misc settings.
 
 **`contextWarningThreshold`** — suppresses the "Context low" warning by setting the
 gap constant to 0 (warning would only fire at 100% usage). Anchored by the adjacent
@@ -111,7 +103,7 @@ src/
     themes.ts                    # Theme injection (incl. diff color overrides)
     diffSyntaxThemeOverride.ts   # Fork: Rust renderer theme ID swap
     modelSelector.ts             # Fork: CUSTOM_MODELS injection
-    forceRemoteControl.ts        # Fork: unlock Remote Control for non-OAuth
+    forceMaxSubscription.ts      # Fork: force Max subscription for API-key users
     contextWarningThreshold.ts   # Fork: context warning gap override
     forceToolSearch.ts           # Fork: bypass domain check for Tool Search
   tests/                         # Vitest: config, migration, systemPromptSync, etc.

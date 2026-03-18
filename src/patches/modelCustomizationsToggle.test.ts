@@ -167,7 +167,7 @@ describe('model customization toggle patch conditions', () => {
     await applyCustomization(baseConfig(), ccInstInfo, [...PATCH_IDS]);
 
     expect(vi.mocked(restoreClijsFromBackup)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(applySystemPrompts)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(applySystemPrompts)).toHaveBeenCalledTimes(0);
     expect(vi.mocked(updateConfigFile)).toHaveBeenCalledTimes(1);
   });
 });

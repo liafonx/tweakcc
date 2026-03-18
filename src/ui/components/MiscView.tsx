@@ -82,9 +82,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
-    forceRemoteControlEnabled: false,
-    forceRemoteControlAtStartup: false,
     suppressContextWarning: false,
+    forceMaxSubscription: false,
+    enableSystemPromptCustomization: false,
   };
 
   const ensureMisc = () => {
@@ -631,16 +631,30 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
-        id: 'forceRemoteControlAtStartup',
-        title: 'Auto-connect Remote Control at startup',
+        id: 'enableSystemPromptCustomization',
+        title: 'Enable system prompt customization',
         description:
-          'Automatically connect to Remote Control when CC starts. Requires OAuth credentials.',
-        getValue: () => settings.misc?.forceRemoteControlAtStartup ?? false,
+          'Sync and apply custom system prompts from ~/.tweakcc/system-prompts/.',
+        getValue: () => settings.misc?.enableSystemPromptCustomization ?? false,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.forceRemoteControlAtStartup =
-              !settings.misc!.forceRemoteControlAtStartup;
+            settings.misc!.enableSystemPromptCustomization =
+              !settings.misc!.enableSystemPromptCustomization;
+          });
+        },
+      },
+      {
+        id: 'forceMaxSubscription',
+        title: 'Force Max subscription mode',
+        description:
+          'Treat API-key users as Max subscribers (model list, defaults, feature gates).',
+        getValue: () => settings.misc?.forceMaxSubscription ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.forceMaxSubscription =
+              !settings.misc!.forceMaxSubscription;
           });
         },
       },
