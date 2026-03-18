@@ -15,11 +15,12 @@ const S4_BODY =
   `if(!x)return null;` +
   `return x.subscriptionType??null}`;
 
-// fD() body — unique via Q8()!=="firstParty" + tengu_cobalt_compass
+// fD() body — unique via !=="firstParty" guard + null-subscription guard (2.1.78+; no GrowthBook flag)
 const FD_BODY =
   `function fD(){` +
   `if(we()||WE()||Q8()!=="firstParty")return!1;` +
-  `return Oq("tengu_cobalt_compass",!1)}`;
+  `if(nq()&&k4()===null)return!1;` +
+  `return!0}`;
 
 // Max branch of zLK(): comma-expression with SF7 push
 const A4_SITE = `if(O.push(ALK),_Q())O.push(SF7())`;
@@ -127,7 +128,9 @@ describe('A3: fD() → true when s8() (best-effort)', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
     expect(result).toContain('function fD(){if(s8())return!0;');
-    expect(result).toContain('tengu_cobalt_compass');
+    // original guards preserved after injection
+    expect(result).toContain('if(we()||WE()||Q8()!=="firstParty")return!1;');
+    expect(result).toContain('if(nq()&&k4()===null)return!1;');
   });
 
   it('continues (non-null) when A3 pattern is absent', () => {

@@ -85,16 +85,19 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
   content = content.replace(a2Pattern, `function ${s8Name}(){return!0}`);
 
   // A3: fD() → true when s8() [best-effort]
-  // For real Max subscribers fD()=true via the tengu_cobalt_compass GrowthBook flag.
   // fD()=true causes: (1) Default model resolves to "Opus 4.6 with 1M context",
   // (2) !fD()=false → EF7 ("Opus (1M context)") not added to model list,
   // (3) bf7() stays false (cachedExtraUsageDisabledReason=undefined for Max accounts)
   //     → eF()=false, _Q()=false → SF7 ("Sonnet (1M context)") not added either.
   // Net result: model list matches real Max — Default + Sonnet + Haiku, no extra entries.
-  // Anchor: Q8()!=="firstParty" guard + tengu_cobalt_compass (unique combination).
+  //
+  // 2.1.77-: function body checked a GrowthBook flag ("tengu_cobalt_compass").
+  // 2.1.78+: flag removed; body is now a pure subscription check:
+  //   function JD(){if(LQ()||BE()||x8()!=="firstParty")return!1;if(Q8()&&k4()===null)return!1;return!0}
+  // Anchor: !=="firstParty" guard + null-subscription guard + bare return!0 (unique combo).
   // Capture group 2 = fD's function name, used by A5.
   const a3Pattern =
-    /(function ([$\w]+)\(\)\{)(if\([$\w]+\(\)\|\|[$\w]+\(\)\|\|[$\w]+\(\)!=="firstParty"\)return!1;return [$\w]+\("tengu_cobalt_compass",!1\)\})/;
+    /(function ([$\w]+)\(\)\{)(if\([$\w]+\(\)\|\|[$\w]+\(\)\|\|[$\w]+\(\)!=="firstParty"\)return!1;if\([$\w]+\(\)&&[$\w]+\(\)===null\)return!1;return!0\})/;
   let fdName: string | null = null;
   const a3Match = content.match(a3Pattern);
   if (a3Match) {
@@ -102,7 +105,7 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(a3Pattern, `$1if(${s8Name}())return!0;$3`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: A3 best-effort — fD() tengu_cobalt_compass pattern not found'
+      'patch: forceMaxSubscription: A3 best-effort — fD() 1M-context guard pattern not found'
     );
   }
 
