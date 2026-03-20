@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index
 
-import { debug, verbose } from '../utils';
+import { debug } from '../utils';
 import { TableFormat } from '../types';
 import { showDiff } from './index';
 
@@ -263,9 +263,10 @@ export const writeTableFormat = (
         debug('Patched table border definition object (spaced format)');
       }
     } else {
-      verbose(
-        'Could not find table border definition pattern - CLI may have changed'
+      console.error(
+        'patch: tableFormat: Could not find table border definition pattern - CLI may have changed'
       );
+      return null;
     }
 
     // 2. Patch vertical border characters (│ -> |)
@@ -361,9 +362,10 @@ export const writeTableFormat = (
         );
       }
     } else {
-      verbose(
-        'Could not find table border definition pattern - CLI may have changed'
+      console.error(
+        'patch: tableFormat: Could not find table border definition pattern - CLI may have changed'
       );
+      return null;
     }
 
     // 2. Remove inter-row separators
@@ -412,8 +414,8 @@ export const writeTableFormat = (
   // Final reporting
   // ==========================================================================
   if (patchCount === 0) {
-    verbose(
-      'No table format patches were applied - patterns may not have matched'
+    console.error(
+      'patch: tableFormat: No table format patches were applied - patterns may not have matched'
     );
     return null;
   }

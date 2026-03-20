@@ -13,18 +13,18 @@ import { escapeForRegex as escRe } from './helpers';
  * Sub-patches:
  *   A1: S4() → "max"          [CRITICAL] Makes kV()=true, Opus default, Max gates
  *   A2: s8() → true           [CRITICAL] Forces subscription UI everywhere
- *   A3: fD() → true when s8() [best-effort] Opus defaults to 1M, no "Opus (1M context)"
- *   A4: Remove _Q() gate in Max model list [best-effort] Removes "Sonnet (1M context)"
- *   A5: Mb() opusplan 1M suffix [best-effort] Opus uses 1M in plan mode
+ *   A3: fD() → true when s8() [CRITICAL] Opus defaults to 1M, no "Opus (1M context)"
+ *   A4: Remove _Q() gate in Max model list [CRITICAL] Removes "Sonnet (1M context)"
+ *   A5: Mb() opusplan 1M suffix [CRITICAL] Opus uses 1M in plan mode
  *   B1: qz() header guard     [CRITICAL] API-key still used for HTTP
  *   B2: Tb() apiKey/authToken [CRITICAL] API-key client options preserved
  *   B3: Tb() bearer injection [CRITICAL] ANTHROPIC_AUTH_TOKEN path preserved
- *   B4: OAuth beta header     [best-effort] oauth-2025 header not injected
- *   B5: auth conflict warning [best-effort] suppress false "Auth conflict" warning
- *   C1: Overload fallback     [best-effort] Retry logic preserved for API
- *   C2: x-should-retry hint   [best-effort] Retry hint preserved
- *   C3: 429 retry             [best-effort] 429 retry preserved
- *   D1: sendBatchWithRetry    [best-effort] Telemetry auth preserved
+ *   B4: OAuth beta header     [CRITICAL] oauth-2025 header not injected
+ *   B5: auth conflict warning [CRITICAL] suppress false "Auth conflict" warning
+ *   C1: Overload fallback     [CRITICAL] Retry logic preserved for API
+ *   C2: x-should-retry hint   [CRITICAL] Retry hint preserved
+ *   C3: 429 retry             [CRITICAL] 429 retry preserved
+ *   D1: sendBatchWithRetry    [CRITICAL] Telemetry auth preserved
  *
  * Returns null if any CRITICAL sub-patch fails.
  */
@@ -81,7 +81,7 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
   }
   content = content.replace(a2Pattern, `function ${s8Name}(){return!0}`);
 
-  // A3: fD() → true when s8() [best-effort]
+  // A3: fD() → true when s8() [CRITICAL]
   // fD()=true causes: (1) Default model resolves to "Opus 4.6 with 1M context",
   // (2) !fD()=false → EF7 ("Opus (1M context)") not added to model list,
   // (3) bf7() stays false (cachedExtraUsageDisabledReason=undefined for Max accounts)
@@ -102,11 +102,12 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(a3Pattern, `$1if(${s8Name}())return!0;$3`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: A3 best-effort — fD() 1M-context guard pattern not found'
+      'patch: forceMaxSubscription: A3 CRITICAL — fD() 1M-context guard pattern not found'
     );
+    return null;
   }
 
-  // A4: Remove SF7 ("Sonnet (1M context)") from Max model list [best-effort]
+  // A4: Remove SF7 ("Sonnet (1M context)") from Max model list [CRITICAL]
   // In the Max branch of zLK(), SF7 is pushed via a comma-expression:
   //   if(O.push(ALK), _Q()) O.push(SF7())
   // With sub2api proxying /api/oauth/claude_cli/client_data returning
@@ -122,11 +123,12 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(a4Pattern, '$1');
   } else {
     console.error(
-      'patch: forceMaxSubscription: A4 best-effort — SF7 comma-expression pattern not found'
+      'patch: forceMaxSubscription: A4 CRITICAL — SF7 comma-expression pattern not found'
     );
+    return null;
   }
 
-  // A5: Mb() opusplan 1M suffix [best-effort]
+  // A5: Mb() opusplan 1M suffix [CRITICAL]
   // Mb() selects the per-turn model for plan/execution split. Its opusplan plan
   // branch returns bare S0() (Opus), while Gh() — the default resolver — appends
   // +(fD()?"[1m]":"") when fD()=true. This patch makes Mb() consistent with Gh()
@@ -139,8 +141,9 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
       content = content.replace(a5Pattern, `$1$2+(${fdName}()?"[1m]":"")`);
     } else {
       console.error(
-        'patch: forceMaxSubscription: A5 best-effort — Mb() opusplan plan branch not found'
+        'patch: forceMaxSubscription: A5 CRITICAL — Mb() opusplan plan branch not found'
       );
+      return null;
     }
   }
 
@@ -193,7 +196,7 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
   }
   content = content.replace(b3Pattern, `$1(${origPred})`);
 
-  // B5: "internal-token" auth conflict warning [best-effort]
+  // B5: "internal-token" auth conflict warning [CRITICAL]
   // The warning notification's isActive calls s8()&&(source==="ANTHROPIC_AUTH_TOKEN"||...).
   // With s8()=true this fires for every API-key user. Restore the original predicate
   // so the warning only shows for genuine OAuth subscribers with a conflicting env var.
@@ -204,11 +207,12 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(b5Pattern, `$1(${origPred})$2`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: B5 best-effort — internal-token warning isActive pattern not found'
+      'patch: forceMaxSubscription: B5 CRITICAL — internal-token warning isActive pattern not found'
     );
+    return null;
   }
 
-  // B4: OAuth beta header injection [best-effort]
+  // B4: OAuth beta header injection [CRITICAL]
   // Without protection: API-key inference requests receive the oauth-2025-04-20
   // beta header which is OAuth-only and may confuse the proxy.
   // Only apply if exactly one push pattern matches (avoid ambiguity).
@@ -220,17 +224,19 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(b4Pattern, `if(${origPred})$1`);
   } else if (b4Matches.length === 0) {
     console.error(
-      'patch: forceMaxSubscription: B4 best-effort — oauth beta header push pattern not found'
+      'patch: forceMaxSubscription: B4 CRITICAL — oauth beta header push pattern not found'
     );
+    return null;
   } else {
     console.error(
-      `patch: forceMaxSubscription: B4 best-effort — ambiguous: ${b4Matches.length} push patterns found, skipping`
+      `patch: forceMaxSubscription: B4 CRITICAL — ambiguous: ${b4Matches.length} push patterns found, skipping`
     );
+    return null;
   }
 
   // ── Group C: Resilience protection ───────────────────────────────────────
 
-  // C1: Overload fallback [best-effort]
+  // C1: Overload fallback [CRITICAL]
   // Anchor: FALLBACK_FOR_ALL_PRIMARY_MODELS — restores API-key retry on 529s.
   const c1Pattern = new RegExp(
     `(FALLBACK_FOR_ALL_PRIMARY_MODELS\\|\\|!)${escS8}\\(\\)(&&[$\\w]+\\([$\\w]+\\.model\\))`
@@ -239,33 +245,39 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(c1Pattern, `$1(${origPred})$2`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: C1 best-effort — overload fallback pattern not found'
+      'patch: forceMaxSubscription: C1 CRITICAL — overload fallback pattern not found'
     );
+    return null;
   }
 
-  // C2: Retry on x-should-retry header [best-effort]
-  const c2Pattern = new RegExp(`(==="true"&&!)${escS8}\\(\\)`);
+  // C2: Retry on x-should-retry header [CRITICAL]
+  // CC 2.1.80 added parens + ||fallback: `==="true"&&(!s8()||LYT())`; make both forms match.
+  const c2Pattern = new RegExp(
+    `(==="true"&&\\(?!)${escS8}\\(\\)(\\|\\|[$\\w]+\\(\\)\\))?`
+  );
   if (c2Pattern.test(content)) {
-    content = content.replace(c2Pattern, `$1(${origPred})`);
+    content = content.replace(c2Pattern, `$1(${origPred})$2`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: C2 best-effort — x-should-retry pattern not found'
+      'patch: forceMaxSubscription: C2 CRITICAL — x-should-retry pattern not found'
     );
+    return null;
   }
 
-  // C3: Retry on HTTP 429 [best-effort]
+  // C3: Retry on HTTP 429 [CRITICAL]
   const c3Pattern = new RegExp(`(===429\\)return!)${escS8}\\(\\)`);
   if (c3Pattern.test(content)) {
     content = content.replace(c3Pattern, `$1(${origPred})`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: C3 best-effort — 429-retry pattern not found'
+      'patch: forceMaxSubscription: C3 CRITICAL — 429-retry pattern not found'
     );
+    return null;
   }
 
   // ── Group D: Telemetry ────────────────────────────────────────────────────
 
-  // D1: sendBatchWithRetry auth selection [best-effort]
+  // D1: sendBatchWithRetry auth selection [CRITICAL]
   // Anchor: expiresAt inside the OAuth token check block in sendBatchWithRetry.
   const d1Pattern = new RegExp(
     `(if\\(![$\\w]+&&)${escS8}\\(\\)` +
@@ -276,8 +288,9 @@ export function writeForceMaxSubscription(oldFile: string): string | null {
     content = content.replace(d1Pattern, `$1(${origPred})$2`);
   } else {
     console.error(
-      'patch: forceMaxSubscription: D1 best-effort — sendBatchWithRetry auth pattern not found'
+      'patch: forceMaxSubscription: D1 CRITICAL — sendBatchWithRetry auth pattern not found'
     );
+    return null;
   }
 
   return content;

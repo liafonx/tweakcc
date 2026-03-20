@@ -536,15 +536,15 @@ export const writeConversationTitle = (oldFile: string): string | null => {
     return null;
   }
 
-  // Optional Step 5: Enable rename conversation command
+  // Step 5: Enable rename conversation command
   const tmp = enableRenameConversationCommand(result);
   if (tmp) {
     result = tmp;
   } else {
-    console.log(
+    console.error(
       'patch: conversationTitle: step 5 failed (enableRenameConversationCommand)'
     );
-    // It's okay if it fails--we'll not abort the whole operation.
+    return null;
   }
 
   return result;

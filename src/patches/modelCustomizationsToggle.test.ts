@@ -10,7 +10,7 @@ import { restoreClijsFromBackup } from '../installationBackup';
 import { writeModelCustomizations } from './modelSelector';
 import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { applySystemPrompts } from './systemPrompts';
-import { applyCustomization } from './index';
+import { applyCustomization, PatchFailureError } from './index';
 
 const mockReadFile = vi.hoisted(() => vi.fn());
 
@@ -138,33 +138,26 @@ describe('model customization toggle patch conditions', () => {
     );
   });
 
-  it('marks patches as failed when patch functions return null', async () => {
+  it('throws PatchFailureError and does not write binary when patch functions return null', async () => {
     const config = baseConfig();
     config.settings.misc.enableModelCustomizations = true;
 
     vi.mocked(writeModelCustomizations).mockReturnValue(null);
     vi.mocked(writeShowMoreItemsInSelectMenus).mockReturnValue(null);
 
-    const { results } = await applyCustomization(config, ccInstInfo, [
-      ...PATCH_IDS,
-    ]);
-
-    const modelResult = results.find(r => r.id === 'model-customizations');
-    const showMoreResult = results.find(
-      r => r.id === 'show-more-items-in-select-menus'
-    );
-
-    expect(modelResult).toMatchObject({ applied: false, failed: true });
-    expect(showMoreResult).toMatchObject({ applied: false, failed: true });
-    expect(vi.mocked(replaceFileBreakingHardLinks)).toHaveBeenCalledWith(
-      '/tmp/claude-cli.js',
-      'base-content',
-      'patch'
-    );
+    await expect(
+      applyCustomization(config, ccInstInfo, [...PATCH_IDS])
+    ).rejects.toThrow(PatchFailureError);
+    expect(vi.mocked(replaceFileBreakingHardLinks)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateConfigFile)).not.toHaveBeenCalled();
   });
 
   it('runs plumbing required for apply customization', async () => {
-    await applyCustomization(baseConfig(), ccInstInfo, [...PATCH_IDS]);
+    // Disable model customizations so patches are skipped (avoids dependency on
+    // mock return values from prior tests since vi.clearAllMocks does not reset impls)
+    const config = baseConfig();
+    config.settings.misc.enableModelCustomizations = false;
+    await applyCustomization(config, ccInstInfo, [...PATCH_IDS]);
 
     expect(vi.mocked(restoreClijsFromBackup)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySystemPrompts)).toHaveBeenCalledTimes(0);

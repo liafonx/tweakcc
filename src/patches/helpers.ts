@@ -1,6 +1,11 @@
 import { escapeIdent } from '.';
 
-export const findChalkVar = (fileContents: string): string | undefined => {
+function throwPatchError(msg: string): never {
+  console.error(msg);
+  throw new Error(msg);
+}
+
+export const findChalkVar = (fileContents: string): string => {
   // Find chalk variable using the counting method
   const chalkPattern =
     /[^$\w]([$\w]+)(?:\.(?:cyan|gray|green|red|yellow|ansi256|bgAnsi256|bgHex|bgRgb|hex|rgb|bold|dim|inverse|italic|strikethrough|underline)\b)+\(/g;
@@ -14,7 +19,7 @@ export const findChalkVar = (fileContents: string): string | undefined => {
   }
 
   // Find the variable with the most occurrences
-  let chalkVar;
+  let chalkVar: string | undefined;
   let maxCount = 0;
   for (const [varName, count] of Object.entries(chalkCounts)) {
     if (count > maxCount) {
@@ -22,15 +27,16 @@ export const findChalkVar = (fileContents: string): string | undefined => {
       chalkVar = varName;
     }
   }
+  if (!chalkVar) {
+    throwPatchError('patch: findChalkVar: failed to find chalk variable');
+  }
   return chalkVar;
 };
 
 /**
  * Find the module loader function
  */
-export const getModuleLoaderFunction = (
-  fileContents: string
-): string | undefined => {
+export const getModuleLoaderFunction = (fileContents: string): string => {
   // Native bundles: look for ,j=(H,$,A)=>{A=H!=null? pattern (module loader)
   // This is distinct from other 3-param functions because of the H!=null check
   const nativeLoaderPattern =
@@ -56,27 +62,23 @@ export const getModuleLoaderFunction = (
     return shortest;
   }
 
-  console.log(
+  throwPatchError(
     'patch: getModuleLoaderFunction: failed to find module loader function'
   );
-  return undefined;
 };
 
 /**
  * Find the React module name
  */
-export const getReactModuleNameNonBun = (
-  fileContents: string
-): string | undefined => {
+export const getReactModuleNameNonBun = (fileContents: string): string => {
   // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element") or "react.transitional.element"
   const pattern =
     /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.(transitional\.)?element"\)/;
   const match = fileContents.match(pattern);
   if (!match) {
-    console.log(
+    throwPatchError(
       'patch: getReactModuleNameNonBun: failed to find React module name'
     );
-    return undefined;
   }
   return match[1];
 };
@@ -97,16 +99,8 @@ export const getReactModuleNameNonBun = (
  * ```
  * `n7L` is `reactModuleNameNonBun`, and `fH` is `reactModuleFunctionBun`
  */
-export const getReactModuleFunctionBun = (
-  fileContents: string
-): string | undefined => {
+export const getReactModuleFunctionBun = (fileContents: string): string => {
   const reactModuleNameNonBun = getReactModuleNameNonBun(fileContents);
-  if (!reactModuleNameNonBun) {
-    console.log(
-      '^ patch: getReactModuleFunctionBun: failed to find React module name (Bun)'
-    );
-    return undefined;
-  }
 
   // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
   const pattern = new RegExp(
@@ -114,16 +108,15 @@ export const getReactModuleFunctionBun = (
   );
   const match = fileContents.match(pattern);
   if (!match) {
-    console.log(
+    throwPatchError(
       `patch: getReactModuleFunctionBun: failed to find React module function (Bun) (reactModuleNameNonBun=${reactModuleNameNonBun})`
     );
-    return undefined;
   }
   return match[1];
 };
 
 // Cache for React variable to avoid recomputing
-let reactVarCache: string | undefined | null = null;
+let reactVarCache: string | null = null;
 
 // Cache for require function name to avoid recomputing
 let requireFuncNameCache: string | null = null;
@@ -131,26 +124,14 @@ let requireFuncNameCache: string | null = null;
 /**
  * Get the React variable name (cached)
  */
-export const getReactVar = (fileContents: string): string | undefined => {
+export const getReactVar = (fileContents: string): string => {
   // Return cached value if available
   if (reactVarCache != null) {
     return reactVarCache;
   }
 
   const moduleLoader = getModuleLoaderFunction(fileContents);
-  if (!moduleLoader) {
-    console.log('^ patch: getReactVar: failed to find moduleLoader');
-    reactVarCache = undefined;
-    return undefined;
-  }
-
-  // Try non-bun first (reactModuleNameNonBun)
   const reactModuleVarNonBun = getReactModuleNameNonBun(fileContents);
-  if (!reactModuleVarNonBun) {
-    console.log('^ patch: getReactVar: failed to find reactModuleVarNonBun');
-    reactVarCache = undefined;
-    return undefined;
-  }
 
   // Pattern: X=moduleLoader(reactModule,1)
   const nonBunPattern = new RegExp(
@@ -166,11 +147,6 @@ export const getReactVar = (fileContents: string): string | undefined => {
 
   // If reactModuleNameNonBun fails, try reactModuleFunctionBun
   const reactModuleFunctionBun = getReactModuleFunctionBun(fileContents);
-  if (!reactModuleFunctionBun) {
-    console.log('^ patch: getReactVar: failed to find reactModuleFunctionBun');
-    reactVarCache = undefined;
-    return undefined;
-  }
   // ;([$\w]+)=T\(fH\(\),1\)
   // Pattern: ;X=moduleLoader(reactModuleBun,1)
   const bunPattern = new RegExp(
@@ -178,11 +154,9 @@ export const getReactVar = (fileContents: string): string | undefined => {
   );
   const bunMatch = fileContents.match(bunPattern);
   if (!bunMatch) {
-    console.log(
+    throwPatchError(
       `patch: getReactVar: failed to find bunPattern (moduleLoader=${moduleLoader}, reactModuleVarNonBun=${reactModuleVarNonBun}, reactModuleFunctionBun=${reactModuleFunctionBun})`
     );
-    reactVarCache = undefined;
-    return undefined;
   }
 
   reactVarCache = bunMatch[1];
@@ -230,10 +204,9 @@ export const findRequireFunc = (fileContents: string): string | undefined => {
   );
   const requireFuncMatch = fileContents.match(requireFuncPattern);
   if (!requireFuncMatch) {
-    console.log(
+    throwPatchError(
       `patch: findRequireFunc: failed to find require function variable (createRequireVar=${createRequireVar})`
     );
-    return undefined;
   }
 
   return requireFuncMatch[1];
@@ -294,7 +267,7 @@ export const escapeForRegex = (s: string): string =>
 /**
  * Find the Text component variable name from Ink
  */
-export const findTextComponent = (fileContents: string): string | undefined => {
+export const findTextComponent = (fileContents: string): string => {
   // Find the Text component function definition from Ink.
   //
   // Pre-2.1.70: parameter destructuring
@@ -308,8 +281,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
     /\bfunction ([$\w]+).{0,30}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
   const match = fileContents.match(textComponentPattern);
   if (!match) {
-    console.log('patch: findTextComponent: failed to find text component');
-    return undefined;
+    throwPatchError('patch: findTextComponent: failed to find text component');
   }
   return match[1];
 };
@@ -317,7 +289,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
 /**
  * Find the Box component variable name
  */
-export const findBoxComponent = (fileContents: string): string | undefined => {
+export const findBoxComponent = (fileContents: string): string => {
   // Method 2: Find Box by direct return of createElement("ink-box"...) (CC 2.1.20+)
   // Pattern: function NAME({children:T,...}){...createElement("ink-box",...),T)}
   const directReturnPattern =
@@ -336,8 +308,7 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
     return reactCompilerBoxMatch[1];
   }
 
-  console.error(
+  throwPatchError(
     'patch: findBoxComponent: failed to find Box component (neither ink-box createElement nor displayName found)'
   );
-  return undefined;
 };

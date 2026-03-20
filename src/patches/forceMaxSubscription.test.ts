@@ -40,7 +40,7 @@ const B5_SITE = `let _=gL();return s8()&&(_.source==="ANTHROPIC_AUTH_TOKEN"||_.s
 
 const C1_SITE = `process.env.FALLBACK_FOR_ALL_PRIMARY_MODELS||!s8()&&OK_(req.model)`;
 
-const C2_SITE = `T==="true"&&!s8()`;
+const C2_SITE = `T==="true"&&(!s8()||LYT())`;
 
 const C3_SITE = `_.status===429)return!s8()`;
 
@@ -81,16 +81,12 @@ describe('name extraction from s8() body', () => {
   });
 
   it('handles $-containing identifiers (e.g. WD$, gb$, e8$)', () => {
-    const content =
-      `function s8$(){if(!WD$())return!1;return gb$(e8$()?.scopes)} ` +
-      // A1: S4
-      `function S4(){if(gL())return dQ();if(!IM())return null;let x=e8$();if(!x)return null;return x.subscriptionType??null} ` +
-      // B1
-      `if(s8$()){let T=e8$();if(!T?.accessToken)return{headers:{},error:"No OAuth token available"}} ` +
-      // B2
-      `apiKey:s8$()?null:_||QZ(),authToken:s8$()?e8$()?.accessToken:void 0 ` +
-      // B3
-      `await lA(),y("[API:auth] OAuth token check complete"),!s8$())zmR(z,R6())`;
+    // Replace all key identifiers with $ variants in the full fixture
+    const content = makeFullFixture()
+      .replace(/\bs8\b/g, 's8$')
+      .replace(/\bWD\b/g, 'WD$')
+      .replace(/\bgb\b/g, 'gb$')
+      .replace(/\be8\b/g, 'e8$');
     const result = writeForceMaxSubscription(content);
     expect(result).not.toBeNull();
     expect(result).toContain('function s8$(){return!0}');
@@ -123,7 +119,7 @@ describe('A2: s8() → true', () => {
   });
 });
 
-describe('A3: fD() → true when s8() (best-effort)', () => {
+describe('A3: fD() → true when s8() (CRITICAL)', () => {
   it('prepends if(s8())return!0 to fD() body', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
@@ -133,13 +129,13 @@ describe('A3: fD() → true when s8() (best-effort)', () => {
     expect(result).toContain('if(nq()&&k4()===null)return!1;');
   });
 
-  it('continues (non-null) when A3 pattern is absent', () => {
+  it('returns null when A3 pattern is absent', () => {
     const content = makeFullFixture().replace(FD_BODY, '// fD removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
-describe('A4: Remove SF7 from Max model list (best-effort)', () => {
+describe('A4: Remove SF7 from Max model list (CRITICAL)', () => {
   it('collapses comma-expression to just O.push(ALK)', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
@@ -147,13 +143,13 @@ describe('A4: Remove SF7 from Max model list (best-effort)', () => {
     expect(result).not.toContain('O.push(SF7())');
   });
 
-  it('continues (non-null) when A4 pattern is absent', () => {
+  it('returns null when A4 pattern is absent', () => {
     const content = makeFullFixture().replace(A4_SITE, '// A4 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
-describe('A5: Mb() opusplan 1M suffix (best-effort)', () => {
+describe('A5: Mb() opusplan 1M suffix (CRITICAL)', () => {
   it('appends +(fD()?"[1m]":"") to S0() in opusplan plan branch', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
@@ -164,17 +160,14 @@ describe('A5: Mb() opusplan 1M suffix (best-effort)', () => {
     );
   });
 
-  it('continues (non-null) when A5 pattern is absent', () => {
+  it('returns null when A5 pattern is absent', () => {
     const content = makeFullFixture().replace(A5_SITE, '// A5 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 
-  it('skips A5 entirely when A3 (fD) was not matched', () => {
+  it('returns null when A3 (fD) was not matched (A3 fails first)', () => {
     const content = makeFullFixture().replace(FD_BODY, '// fD removed');
-    const result = writeForceMaxSubscription(content);
-    expect(result).not.toBeNull();
-    // A5 site is unchanged — no suffix appended since fdName was null
-    expect(result).toContain('"opusplan"&&T==="plan"&&!R)return S0()');
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
@@ -226,31 +219,26 @@ describe('B3: Tb() bearer injection', () => {
   });
 });
 
-describe('B4: OAuth beta header (best-effort)', () => {
+describe('B4: OAuth beta header (CRITICAL)', () => {
   it('replaces single push pattern with origPred guard', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
     expect(result).toContain('if(WD()&&gb(e8()?.scopes))headers.push(xJ)');
   });
 
-  it('continues (non-null) when B4 pattern is absent', () => {
+  it('returns null when B4 pattern is absent', () => {
     const content = makeFullFixture().replace(B4_SITE, '// B4 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 
-  it('skips B4 when multiple push patterns exist (ambiguous)', () => {
+  it('returns null when B4 is ambiguous (multiple push patterns)', () => {
     // Add a second push pattern to trigger ambiguity guard
     const content = makeFullFixture() + ' if(s8())other.push(yJ)';
-    const result = writeForceMaxSubscription(content);
-    expect(result).not.toBeNull();
-    // Neither push pattern should be replaced (both still say s8())
-    // After A2 the function body is replaced, but call sites still use s8()
-    expect(result).toContain('if(s8())headers.push(xJ)');
-    expect(result).toContain('if(s8())other.push(yJ)');
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
-describe('B5: auth conflict warning (best-effort)', () => {
+describe('B5: auth conflict warning (CRITICAL)', () => {
   it('replaces s8() with origPred in internal-token isActive', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
@@ -259,15 +247,15 @@ describe('B5: auth conflict warning (best-effort)', () => {
     );
   });
 
-  it('continues (non-null) when B5 pattern is absent', () => {
+  it('returns null when B5 pattern is absent', () => {
     const content = makeFullFixture().replace(B5_SITE, '// B5 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
 // ── Group C: Resilience protection ───────────────────────────────────────────
 
-describe('C1: Overload fallback (best-effort)', () => {
+describe('C1: Overload fallback (CRITICAL)', () => {
   it('wraps s8() in !(origPred) for overload fallback', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
@@ -276,41 +264,48 @@ describe('C1: Overload fallback (best-effort)', () => {
     );
   });
 
-  it('continues (non-null) when C1 pattern is absent', () => {
+  it('returns null when C1 pattern is absent', () => {
     const content = makeFullFixture().replace(C1_SITE, '// C1 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
-describe('C2: x-should-retry hint (best-effort)', () => {
+describe('C2: x-should-retry hint (CRITICAL)', () => {
   it('wraps s8() in !(origPred) for retry hint', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
+    expect(result).not.toBeNull();
+    expect(result).toContain('==="true"&&(!(WD()&&gb(e8()?.scopes))||LYT())');
+  });
+
+  it('handles legacy form without ||fallback (pre-CC 2.1.80)', () => {
+    const content = makeFullFixture().replace(C2_SITE, 'T==="true"&&!s8()');
+    const result = writeForceMaxSubscription(content);
     expect(result).not.toBeNull();
     expect(result).toContain('==="true"&&!(WD()&&gb(e8()?.scopes))');
   });
 
-  it('continues (non-null) when C2 pattern is absent', () => {
+  it('returns null when C2 pattern is absent', () => {
     const content = makeFullFixture().replace(C2_SITE, '// C2 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
-describe('C3: 429 retry (best-effort)', () => {
+describe('C3: 429 retry (CRITICAL)', () => {
   it('wraps s8() in !(origPred) for 429 retry', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
     expect(result).toContain('===429)return!(WD()&&gb(e8()?.scopes))');
   });
 
-  it('continues (non-null) when C3 pattern is absent', () => {
+  it('returns null when C3 pattern is absent', () => {
     const content = makeFullFixture().replace(C3_SITE, '// C3 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
 // ── Group D: Telemetry ───────────────────────────────────────────────────────
 
-describe('D1: sendBatchWithRetry (best-effort)', () => {
+describe('D1: sendBatchWithRetry (CRITICAL)', () => {
   it('wraps s8() in (origPred) for sendBatchWithRetry', () => {
     const result = writeForceMaxSubscription(makeFullFixture());
     expect(result).not.toBeNull();
@@ -319,9 +314,9 @@ describe('D1: sendBatchWithRetry (best-effort)', () => {
     );
   });
 
-  it('continues (non-null) when D1 pattern is absent', () => {
+  it('returns null when D1 pattern is absent', () => {
     const content = makeFullFixture().replace(D1_SITE, '// D1 removed');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });
 
@@ -333,9 +328,10 @@ describe('critical failure returns null immediately', () => {
     expect(writeForceMaxSubscription(content)).toBeNull();
   });
 
-  it('best-effort failures do not cause null return', () => {
-    // Remove all best-effort sites, keep only CRITICAL ones
+  it('returns null when any single site is missing', () => {
+    // Every site is now CRITICAL — removing any one causes null
     const content = [S8_BODY, S4_BODY, B1_SITE, B2_SITE, B3_SITE].join(' ');
-    expect(writeForceMaxSubscription(content)).not.toBeNull();
+    // Missing FD_BODY (A3) → null
+    expect(writeForceMaxSubscription(content)).toBeNull();
   });
 });

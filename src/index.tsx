@@ -20,6 +20,7 @@ import {
 } from './utils';
 import {
   applyCustomization,
+  PatchFailureError,
   PatchResult,
   PatchGroup,
   getAllPatchDefinitions,
@@ -477,34 +478,7 @@ async function handleApplyMode(
     // Print patch results
     printPatchResults(results, patchFilter);
 
-    // Check if any patches failed
-    const hasFailures = results.some(r => r.failed);
-    const hasSystemPromptChanges = results.some(
-      r => r.group === PatchGroup.SYSTEM_PROMPTS && r.applied
-    );
-
-    if (hasFailures) {
-      console.log(chalk.yellow('Customizations applied with some failures.'));
-      console.log(
-        chalk.dim(
-          'These patching errors do not affect your system prompt patches.'
-        )
-      );
-      if (hasSystemPromptChanges) {
-        console.log(
-          chalk.dim(
-            'Your system prompt customizations were still applied successfully.'
-          )
-        );
-      }
-      console.log(
-        chalk.dim(
-          'Please open an issue on https://github.com/Piebald-AI/tweakcc/issues/new reporting these patching errors.'
-        )
-      );
-    } else {
-      console.log(chalk.green('Customizations applied successfully!'));
-    }
+    console.log(chalk.green('Customizations applied successfully!'));
     console.log(
       chalk.dim(
         'Run with --restore/--revert to revert Claude Code to its original state.'
@@ -512,6 +486,16 @@ async function handleApplyMode(
     );
     process.exit(0);
   } catch (error) {
+    if (error instanceof PatchFailureError) {
+      printPatchResults(error.results, patchFilter);
+      console.error(chalk.red(error.message));
+      console.error(
+        chalk.red(
+          'Binary was NOT re-patched. Fix the failing patches and re-run --apply.'
+        )
+      );
+      process.exit(1);
+    }
     if (error instanceof InstallationDetectionError) {
       console.error(chalk.red(`Error: ${error.message}`));
       process.exit(1);

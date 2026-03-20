@@ -146,16 +146,24 @@ interface ResolvedVars {
 /**
  * Resolve all helper variables from the content.
  * Clears caches first to ensure fresh results.
+ * Helpers that fail now throw; catch here to preserve string | undefined contract.
  */
 function resolveVars(content: string): ResolvedVars {
   clearCaches();
+  const tryGet = (fn: () => string): string | undefined => {
+    try {
+      return fn();
+    } catch {
+      return undefined;
+    }
+  };
   return {
-    chalkVar: findChalkVar(content),
-    moduleLoaderFunction: getModuleLoaderFunction(content),
-    reactVar: getReactVar(content),
+    chalkVar: tryGet(() => findChalkVar(content)),
+    moduleLoaderFunction: tryGet(() => getModuleLoaderFunction(content)),
+    reactVar: tryGet(() => getReactVar(content)),
     requireFuncName: getRequireFuncName(content),
-    textComponent: findTextComponent(content),
-    boxComponent: findBoxComponent(content),
+    textComponent: tryGet(() => findTextComponent(content)),
+    boxComponent: tryGet(() => findBoxComponent(content)),
   };
 }
 

@@ -135,6 +135,16 @@ export interface ApplyCustomizationResult {
   results: PatchResult[];
 }
 
+export class PatchFailureError extends Error {
+  constructor(public readonly results: PatchResult[]) {
+    const failed = results.filter(r => r.failed && !r.skipped);
+    super(
+      `${failed.length} patch(es) failed: ${failed.map(r => r.id).join(', ')}`
+    );
+    this.name = 'PatchFailureError';
+  }
+}
+
 // =============================================================================
 // Patch Definitions (Single Source of Truth)
 // =============================================================================
@@ -526,11 +536,18 @@ const applyPatchImplementations = (
     }
 
     debug(`Applying patch: ${def.name}`);
-    const result = impl.fn(content);
+    let result: string | null;
+    try {
+      result = impl.fn(content);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`patch: ${def.id}: ${msg}`);
+      result = null;
+    }
     const failed = result === null;
     const applied = !failed && result !== content;
 
-    if (!failed) {
+    if (result !== null) {
       content = result;
     }
 
@@ -908,6 +925,14 @@ export const applyCustomization = async (
     applyPatchImplementations(content, patchImplementations, patchFilter);
   content = patchedContent;
   allResults.push(...patchResults);
+
+  // ==========================================================================
+  // Fail-fast gate: abort before writing if any non-skipped patch failed
+  // ==========================================================================
+  const failures = allResults.filter(r => r.failed && !r.skipped);
+  if (failures.length > 0) {
+    throw new PatchFailureError(allResults);
+  }
 
   // ==========================================================================
   // Write the modified content back

@@ -127,10 +127,10 @@ export const applySystemPrompts = async (
             // number by accounting for any frontmatter/comment lines.
             const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
             const lineText = contentLines[lineNum - 1] || '';
-            console.log(
+            console.error(
               formatBacktickError(filePath, absoluteLineNum, lineText, columns)
             );
-            console.log();
+            console.error();
           }
 
           continue; // Skip this prompt
@@ -206,10 +206,8 @@ export const applySystemPrompts = async (
         !prompt.name.startsWith('Data:') &&
         prompt.name !== 'Skill: Build with Claude API'
       ) {
-        console.log(
-          chalk.yellow(
-            `Could not find system prompt "${prompt.name}" in cli.js (using regex ${stringifyRegex(pattern)})`
-          )
+        console.error(
+          `Could not find system prompt "${prompt.name}" in cli.js (using regex ${stringifyRegex(pattern)})`
         );
       }
 
