@@ -11,15 +11,6 @@ const mock2171 =
   'let Y=new H(_,q,T,K).render($,A,O)' +
   '}';
 
-// 2.1.70: React Compiler cached useMemo, inline render after Math.max
-const mock2170 =
-  'let Z=Math.max(1,Math.floor(D)),N;' +
-  'if(R[6]!==J||T[1]!==H)' +
-  'N=J.render(h,Z,A)';
-
-// Pre-2.1.70: direct return with Math.max inline
-const mockOld = 'let W=Math.max(1,Math.floor($));return J.render(q,W,A)';
-
 describe('diffSyntaxThemeOverride', () => {
   describe('2.1.71+ wrapper-function pattern', () => {
     it('should intercept theme in new Class().render() call', () => {
@@ -37,37 +28,6 @@ describe('diffSyntaxThemeOverride', () => {
       expect(result).toContain('if(!H)return null');
       expect(result).toContain('if(w)return w');
       expect(result).toContain('let Y=');
-    });
-  });
-
-  describe('2.1.70 inline-render pattern', () => {
-    it('should intercept theme in module.render() call after Math.max', () => {
-      const result = writeDiffSyntaxThemeOverride(mock2170);
-      expect(result).not.toBeNull();
-      expect(result).toContain('.test(h)?h:"dark-ansi"');
-      expect(result).toContain('J.render(');
-      // width and dim preserved
-      expect(result).toContain(',Z,A)');
-    });
-
-    it('should preserve Math.max expression', () => {
-      const result = writeDiffSyntaxThemeOverride(mock2170)!;
-      expect(result).toContain('Math.max(1,Math.floor(D))');
-    });
-  });
-
-  describe('pre-2.1.70 direct-return pattern', () => {
-    it('should intercept theme in return module.render() call', () => {
-      const result = writeDiffSyntaxThemeOverride(mockOld);
-      expect(result).not.toBeNull();
-      expect(result).toContain('.test(q)?q:"dark-ansi"');
-      expect(result).toContain('return J.render(');
-      expect(result).toContain(',W,A)');
-    });
-
-    it('should preserve the let/Math.max expression', () => {
-      const result = writeDiffSyntaxThemeOverride(mockOld)!;
-      expect(result).toContain('let W=Math.max(1,Math.floor($))');
     });
   });
 

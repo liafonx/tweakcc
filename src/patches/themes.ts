@@ -58,12 +58,10 @@ function getThemesLocation(oldFile: string): {
   const objArrPat =
     /\[(?:\.\.\.\[\],)?(?:\{label:"(?:Dark|Light).+?",value:".+?"\},?)+\]/;
   // CC 2.1.70+: lookup object {auto:"Auto...",dark:"Dark mode",...}[WT.value...]
-  const objPatNew =
-    /\{auto:"[^"]+",(?:(?:[$\w]+|"[$\w-]+"): ?"[^"]+",?)+\}(?=\[)/;
-  const objPat = /return\{(?:[$\w]+?:"(?:Dark|Light).+?",?)+\}/;
+  const objPat = /\{auto:"[^"]+",(?:(?:[$\w]+|"[$\w-]+"): ?"[^"]+",?)+\}(?=\[)/;
 
   const objArrMatch = oldFile.match(objArrPat);
-  const objMatch = oldFile.match(objPat) ?? oldFile.match(objPatNew);
+  const objMatch = oldFile.match(objPat);
 
   if (!objArrMatch || objArrMatch.index == undefined) {
     console.error('patch: themes: failed to find objArrMatch');
@@ -111,26 +109,16 @@ export const writeThemes = (
 
   // Update theme mapping object (obj)
   // CC 2.1.70+: {auto:"Auto...",dark:"Dark mode",...} — preserve the auto: entry
-  // Pre-2.1.70: return{dark:"Dark",...}
-  const existingObj = newFile.slice(
-    locations.obj.startIndex,
-    locations.obj.startIndex + 6
-  );
   const themeEntries = Object.fromEntries(
     themes.map(theme => [theme.id, theme.name])
   );
-  let obj: string;
-  if (existingObj.startsWith('{')) {
-    const fullObjText = newFile.slice(
-      locations.obj.startIndex,
-      locations.obj.endIndex
-    );
-    const autoMatch = fullObjText.match(/^\{auto:"([^"]+)"/);
-    const autoEntry = autoMatch ? `"auto":"${autoMatch[1]}",` : '';
-    obj = '{' + autoEntry + JSON.stringify(themeEntries).slice(1);
-  } else {
-    obj = 'return' + JSON.stringify(themeEntries);
-  }
+  const fullObjText = newFile.slice(
+    locations.obj.startIndex,
+    locations.obj.endIndex
+  );
+  const autoMatch = fullObjText.match(/^\{auto:"([^"]+)"/);
+  const autoEntry = autoMatch ? `"auto":"${autoMatch[1]}",` : '';
+  const obj = '{' + autoEntry + JSON.stringify(themeEntries).slice(1);
   newFile =
     newFile.slice(0, locations.obj.startIndex) +
     obj +

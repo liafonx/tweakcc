@@ -1,9 +1,6 @@
 // Please see the note about writing patches in ./index
 
-// Helper: escape a string for use as a literal in a RegExp pattern.
-// Minified identifiers may contain '$' (regex end-of-string anchor), so we
-// must escape it along with all other regex metacharacters.
-const escRe = (s: string): string => s.replace(/[$.*+?^{}()|[\]\\]/g, '\\$&');
+import { escapeForRegex as escRe } from './helpers';
 
 /**
  * writeForceMaxSubscription — forces CC to treat an API-key user as a Max

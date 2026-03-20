@@ -1,113 +1,47 @@
 import { describe, it, expect } from 'vitest';
 import { writeAgentsMd } from './agentsMd';
 
-const mockFunction =
-  'function _t7(A,q){try{let K=x1();' +
-  'if(!K.existsSync(A)||!K.statSync(A).isFile())return null;' +
-  'let Y=UL9(A).toLowerCase();' +
-  'if(Y&&!dL9.has(Y))' +
-  'return(I(`Skipping non-text file in @include: ${A}`),null);' +
-  'let z=K.readFileSync(A,{encoding:"utf-8"}),' +
-  '{content:w,paths:H}=cL9(z);' +
-  'return{path:A,type:q,content:w,globs:H};' +
-  '}catch(K){' +
-  'if(K instanceof Error&&K.message.includes("EACCES"))' +
-  'n("tengu_claude_md_permission_error",{is_access_error:1});' +
-  '}return null;}';
-
-// CC 2.1.70+: no existsSync/statSync/isFile guard, uses try/catch ENOENT
-const mockFunction270 =
-  'function lZR(T,_){try{' +
-  'let q=z_().readFileSync(T,{encoding:"utf-8"}),' +
-  'A=c1.extname(T).toLowerCase();' +
-  'if(A&&!Ia6.has(A))' +
-  'return L(`Skipping non-text file in @include: ${T}`),null;' +
-  'let{content:$,paths:H}=xa6(q),O=$;' +
-  'return{path:T,type:_,content:O,globs:H};' +
-  '}catch(R){let q=R.code;' +
-  'if(q==="ENOENT"||q==="EISDIR")return null;' +
-  'if(q==="EACCES")n("tengu_claude_md_permission_error",{is_access_error:1});' +
-  '}return null;}';
+// CC 2.1.80+: split-reader — XmK reads file, tq7 processes, eq7 handles errors
+// function XmK(_,T){try{let K=OT().readFileSync(_,{encoding:"utf-8"});return tq7(K,_,T)}catch(q){return eq7(q,_),null}}
+const mockSplitReader =
+  'function XmK(_,T){try{' +
+  'let K=OT().readFileSync(_,{encoding:"utf-8"});' +
+  'return tq7(K,_,T)' +
+  '}catch(q){return eq7(q,_),null}}';
 
 const altNames = ['AGENTS.md', 'GEMINI.md', 'QWEN.md'];
 
 describe('agentsMd', () => {
-  describe('writeAgentsMd (pre-2.1.70)', () => {
-    it('should inject fallback at early return null when CLAUDE.md is missing', () => {
-      const result = writeAgentsMd(mockFunction, altNames);
+  describe('writeAgentsMd (CC 2.1.80+ split-reader)', () => {
+    it('should inject ENOENT fallback in catch block', () => {
+      const result = writeAgentsMd(mockSplitReader, altNames);
       expect(result).not.toBeNull();
       expect(result).toContain('didReroute');
       expect(result).toContain('endsWith("/CLAUDE.md")');
       expect(result).toContain('AGENTS.md');
-      expect(result).toMatch(/\.isFile\(\)\)\{.*?return null;\}/);
-    });
-
-    it('should preserve CLAUDE.md content when present', () => {
-      const result = writeAgentsMd(mockFunction, altNames)!;
-      const returnIdx = result.indexOf('return{path:');
-      expect(returnIdx).toBeGreaterThan(-1);
-      const beforeReturn = result.slice(Math.max(0, returnIdx - 50), returnIdx);
-      expect(beforeReturn).not.toContain('didReroute');
-    });
-
-    it('should pass didReroute=true in recursive calls', () => {
-      const result = writeAgentsMd(mockFunction, altNames)!;
-      expect(result).toContain('return _t7(altPath,q,true)');
-    });
-
-    it('should return null when no alternatives are found', () => {
-      const result = writeAgentsMd(mockFunction, altNames)!;
-      expect(result).toMatch(/\}return null;\}/);
     });
 
     it('should add didReroute parameter to function signature', () => {
-      const result = writeAgentsMd(mockFunction, altNames)!;
-      expect(result).toContain('function _t7(A,q,didReroute)');
+      const result = writeAgentsMd(mockSplitReader, altNames)!;
+      expect(result).toContain('function XmK(_,T,didReroute)');
     });
 
-    it('should use the correct fs expression', () => {
-      const result = writeAgentsMd(mockFunction, altNames)!;
-      expect(result).toContain('K.existsSync(altPath)');
-      expect(result).toContain('K.statSync(altPath)');
+    it('should use recursive call with didReroute=true', () => {
+      const result = writeAgentsMd(mockSplitReader, altNames)!;
+      expect(result).toContain('let r=XmK(altPath,T,true)');
+      expect(result).toContain('if(r)return r');
     });
 
-    it('should return null when function pattern is not found', () => {
-      const result = writeAgentsMd('not a valid file', altNames);
-      expect(result).toBeNull();
+    it('should preserve the original error handler call', () => {
+      const result = writeAgentsMd(mockSplitReader, altNames)!;
+      expect(result).toContain('return eq7(q,_),null');
     });
   });
 
-  describe('writeAgentsMd (CC 2.1.70+)', () => {
-    it('should inject fallback at ENOENT/EISDIR catch block', () => {
-      const result = writeAgentsMd(mockFunction270, altNames);
-      expect(result).not.toBeNull();
-      expect(result).toContain('didReroute');
-      expect(result).toContain('endsWith("/CLAUDE.md")');
-      expect(result).toContain('AGENTS.md');
-      expect(result).toMatch(/==="EISDIR"\)\{.*?return null;\}/);
-    });
-
-    it('should add didReroute parameter to function signature', () => {
-      const result = writeAgentsMd(mockFunction270, altNames)!;
-      expect(result).toContain('function lZR(T,_,didReroute)');
-    });
-
-    it('should use recursive call instead of existsSync', () => {
-      const result = writeAgentsMd(mockFunction270, altNames)!;
-      expect(result).toContain('let r=lZR(altPath,_,true)');
-      expect(result).toContain('if(r)return r');
-      // Should NOT use existsSync/statSync (no longer in function)
-      expect(result).not.toContain('existsSync(altPath)');
-    });
-
-    it('should preserve normal content path', () => {
-      const result = writeAgentsMd(mockFunction270, altNames)!;
-      expect(result).toContain('return{path:T,type:_,content:O,globs:H}');
-    });
-
-    it('should return null when no alternatives match', () => {
-      const result = writeAgentsMd(mockFunction270, altNames)!;
-      expect(result).toMatch(/\}return null;\}/);
+  describe('null-return case', () => {
+    it('should return null when no pattern matches', () => {
+      const result = writeAgentsMd('not a valid file', altNames);
+      expect(result).toBeNull();
     });
   });
 });

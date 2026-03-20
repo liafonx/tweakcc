@@ -288,6 +288,9 @@ export const clearCaches = (): void => {
   clearRequireFuncNameCache();
 };
 
+export const escapeForRegex = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Find the Text component variable name from Ink
  */
@@ -315,14 +318,6 @@ export const findTextComponent = (fileContents: string): string | undefined => {
  * Find the Box component variable name
  */
 export const findBoxComponent = (fileContents: string): string | undefined => {
-  // Method 1: Find Box by ink-box createElement with local variable (CC ~2.0.x)
-  const inkBoxPattern =
-    /function ([$\w]+)\(.{0,2000}[^$\w]([$\w]+)=[$\w]+(?:\.default)?\.createElement\("ink-box".{0,200}?return \2/;
-  const inkBoxMatch = fileContents.match(inkBoxPattern);
-  if (inkBoxMatch) {
-    return inkBoxMatch[1];
-  }
-
   // Method 2: Find Box by direct return of createElement("ink-box"...) (CC 2.1.20+)
   // Pattern: function NAME({children:T,...}){...createElement("ink-box",...),T)}
   const directReturnPattern =
@@ -330,13 +325,6 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   const directReturnMatch = fileContents.match(directReturnPattern);
   if (directReturnMatch) {
     return directReturnMatch[1];
-  }
-
-  // Method 3: Search for Box displayName (older CC versions, 0.2.9 - 2.0.77 at least)
-  const boxDisplayNamePattern = /[^$\w]([$\w]+)\.displayName="Box"/;
-  const boxDisplayNameMatch = fileContents.match(boxDisplayNamePattern);
-  if (boxDisplayNameMatch) {
-    return boxDisplayNameMatch[1];
   }
 
   // Method 4: React Compiler cached Box (CC 2.1.80+)

@@ -42,22 +42,13 @@ export const findVersionOutputLocation = (
 const findTweakccVersionLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // Pre-2.1.70: contiguous bold + dimColor pattern
-  const patOld =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const matchOld = fileContents.match(patOld);
-  if (matchOld && matchOld.index !== undefined) {
-    const insertIndex = matchOld.index + matchOld[0].length;
-    return { startIndex: insertIndex, endIndex: insertIndex };
-  }
-
   // 2.1.70+: createElement(TEXT,null,VAR," ",createElement(TEXT,{dimColor:!0},"v",VAR))
-  const patNew =
+  const pat =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,([$\w]+)," ",\1\.createElement\(\2,\{dimColor:!0\},"v",([$\w]+)\)\)/;
-  const matchNew = fileContents.match(patNew);
-  if (matchNew && matchNew.index !== undefined) {
+  const match = fileContents.match(pat);
+  if (match && match.index !== undefined) {
     // Insert before the last ) to add children to the outer createElement
-    const insertIndex = matchNew.index + matchNew[0].length - 1;
+    const insertIndex = match.index + match[0].length - 1;
     return { startIndex: insertIndex, endIndex: insertIndex };
   }
 
@@ -65,191 +56,6 @@ const findTweakccVersionLocation = (
     'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
   );
   return null;
-};
-
-/**
- * PATCH 4: Inserts tweakcc version in the indicator view
- * Returns the modified content and the position where the closing paren was added
- */
-const applyIndicatorViewPatch = (
-  fileContents: string,
-  tweakccVersion: string,
-  reactVar: string,
-  boxComponent: string,
-  textComponent: string,
-  chalkVar: string
-): { content: string; closingParenIndex: number } | null => {
-  // 1. Find alignItems:"center",minHeight:<value>, where value can be a number or ternary
-  const alignItemsPattern =
-    /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
-  const alignItemsMatch = fileContents.match(alignItemsPattern);
-  if (!alignItemsMatch || alignItemsMatch.index === undefined) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find alignItems pattern for PATCH 4'
-    );
-    return null;
-  }
-
-  // 2. Replace alignItems:"center",minHeight:<value>, with just minHeight:<value>,
-  const minHeightValue = alignItemsMatch[1];
-  let content =
-    fileContents.slice(0, alignItemsMatch.index) +
-    `minHeight:${minHeightValue},` +
-    fileContents.slice(alignItemsMatch.index + alignItemsMatch[0].length);
-
-  // 3. Go back 200 chars from the alignItems location
-  const lookbackStart = Math.max(0, alignItemsMatch.index - 200);
-  const lookbackSubstring = content.slice(
-    lookbackStart,
-    alignItemsMatch.index + 'minHeight:9,'.length + '},'.length
-  );
-
-  // 4. Find the LAST createElement call in that subsection to get the insertion point
-  const createElementPattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),(?:\w+|\{[^}]+\}),/g;
-  const matches = Array.from(lookbackSubstring.matchAll(createElementPattern));
-  if (matches.length === 0) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find createElement for PATCH 4'
-    );
-    return null;
-  }
-
-  const lastMatch = matches[matches.length - 1];
-
-  // Calculate the absolute position after the createElement call
-  const matchPositionInFile =
-    lookbackStart + lastMatch.index! + lastMatch[0].length;
-
-  // 5. Insert the tweakcc version code after the createElement call
-  const insertCode = `${reactVar}.createElement(${textComponent}, null, ${chalkVar}.blue.bold("     + tweakcc v${tweakccVersion}")),${reactVar}.createElement(${boxComponent},{alignItems:"center",flexDirection:"column"},`;
-
-  const oldContent = content;
-  content =
-    content.slice(0, matchPositionInFile) +
-    insertCode +
-    content.slice(matchPositionInFile);
-
-  showDiff(
-    oldContent,
-    content,
-    insertCode,
-    matchPositionInFile,
-    matchPositionInFile
-  );
-
-  // 6. Use stack machine to find where to add the closing paren
-  let level = 1;
-  let currentIndex = matchPositionInFile + insertCode.length;
-  let closingParenIndex = -1;
-
-  while (currentIndex < content.length) {
-    const ch = content[currentIndex];
-    if (ch === '(') {
-      level++;
-    } else if (ch === ')') {
-      if (level === 1) {
-        // Found the location - this is where we add the closing paren
-        closingParenIndex = currentIndex;
-        break;
-      }
-      level--;
-    }
-    currentIndex++;
-  }
-
-  if (closingParenIndex === -1) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find closing paren for PATCH 4'
-    );
-    return null;
-  }
-
-  // 7. Add ")," at the location
-  const oldContent2 = content;
-  content =
-    content.slice(0, closingParenIndex) +
-    '),' +
-    content.slice(closingParenIndex);
-
-  showDiff(oldContent2, content, '),', closingParenIndex, closingParenIndex);
-
-  return { content, closingParenIndex: closingParenIndex + 2 }; // +2 for the added "),"
-};
-
-/**
- * PATCH 5: Inserts patches applied list in the indicator view
- * Uses stack machine starting at level 2 to find insertion point
- */
-const applyIndicatorPatchesListPatch = (
-  fileContents: string,
-  startIndex: number,
-  reactVar: string,
-  boxComponent: string,
-  textComponent: string,
-  chalkVar: string,
-  patchesApplies: string[]
-): string | null => {
-  // Start stack machine at level = 5
-  let level = 4; // This right at the very end of the header component, right after the debug banner.
-  let currentIndex = startIndex;
-  let insertionIndex = -1;
-
-  while (currentIndex < fileContents.length) {
-    const ch = fileContents[currentIndex];
-    if (ch === '(') {
-      level++;
-    } else if (ch === ')') {
-      if (level === 1) {
-        // Found the location - this is where we add the patches list
-        insertionIndex = currentIndex;
-        break;
-      }
-      level--;
-    }
-    currentIndex++;
-  }
-
-  if (insertionIndex === -1) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find insertion point for PATCH 5'
-    );
-    return null;
-  }
-
-  // Build the patches applied list (same format as PATCH 3)
-  const lines = [];
-  lines.push(
-    `,${reactVar}.createElement(${boxComponent}, { flexDirection: "column" },`
-  );
-  lines.push(
-    `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "✓ tweakcc patches are applied")),`
-  );
-  for (let item of patchesApplies) {
-    item = item.replace('CHALK_VAR', chalkVar);
-    lines.push(
-      `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {dimColor: true}, \`  * ${item}\`)),`
-    );
-  }
-  lines.push('),');
-  const patchesListCode = lines.join('');
-
-  // Insert at the found location
-  const oldContent = fileContents;
-  const content =
-    fileContents.slice(0, insertionIndex) +
-    patchesListCode +
-    fileContents.slice(insertionIndex);
-
-  showDiff(
-    oldContent,
-    content,
-    patchesListCode,
-    insertionIndex,
-    insertionIndex
-  );
-
-  return content;
 };
 
 /**
@@ -441,42 +247,6 @@ export const writePatchesAppliedIndication = (
       patchesListLoc.startIndex,
       patchesListLoc.endIndex
     );
-  }
-
-  // PATCH 4: Add tweakcc version to indicator view (if enabled)
-  // Non-fatal: React Compiler (2.1.70+) flattens createElement nesting,
-  // so the stack machine may fail. Header patches (1-3) still apply.
-  let patch4ClosingParenIndex = -1;
-  if (showTweakccVersion) {
-    const patch4Result = applyIndicatorViewPatch(
-      content,
-      tweakccVersion,
-      reactVar,
-      boxComponent,
-      textComponent,
-      chalkVar
-    );
-    if (patch4Result) {
-      content = patch4Result.content;
-      patch4ClosingParenIndex = patch4Result.closingParenIndex;
-    }
-  }
-
-  // PATCH 5: Add patches applied list to indicator view (if enabled)
-  // Non-fatal: same React Compiler caveat as Patch 4.
-  if (showPatchesApplied && patch4ClosingParenIndex !== -1) {
-    const finalContent = applyIndicatorPatchesListPatch(
-      content,
-      patch4ClosingParenIndex,
-      reactVar,
-      boxComponent,
-      textComponent,
-      chalkVar,
-      patchesApplies
-    );
-    if (finalContent) {
-      content = finalContent;
-    }
   }
 
   return content;

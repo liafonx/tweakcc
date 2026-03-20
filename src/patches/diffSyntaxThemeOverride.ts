@@ -66,51 +66,10 @@ export const writeDiffSyntaxThemeOverride = (
     matchIndex = match2171.index;
     matchLength = match2171[0].length;
   } else {
-    // 2.1.70: React Compiler cached useMemo pattern, inline render
-    // let Z=Math.max(1,Math.floor(D)),N;if(R[6]!==J||...)N=J.render(h,Z,A)
-    //
-    // Capture groups: 1=widthVar 2=rawWidthVar 3=extraVar 4=assignVar
-    //                 5=moduleVar 6=themeVar 7=widthRef 8=dimVar
-    const pat2170 =
-      /let ([$\w]+)=Math\.max\(1,Math\.floor\(([$\w]+)\)\),([$\w]+);if\((?:[^()]*\([^()]*\))*[^()]*\)([$\w]+)=([$\w]+)\.render\(([$\w]+),([$\w]+),([$\w]+)\)/;
-
-    const match2170 = oldFile.match(pat2170);
-    if (match2170 && match2170.index !== undefined) {
-      const [, , , , , moduleVar, themeVar, widthRef, dimVar] = match2170;
-      const oldRender = `${moduleVar}.render(${themeVar},${widthRef},${dimVar})`;
-      const newRender =
-        `${moduleVar}.render(` +
-        `${BUILTIN_THEMES}.test(${themeVar})?${themeVar}:"dark-ansi"` +
-        `,${widthRef},${dimVar})`;
-      replacement = match2170[0].replace(oldRender, newRender);
-      matchIndex = match2170.index;
-      matchLength = match2170[0].length;
-    } else {
-      // Pre-2.1.70: direct return pattern
-      // let W=Math.max(1,Math.floor($));return J.render(q,W,A)
-      //
-      // Capture groups: 1=widthVar 2=rawWidthVar 3=moduleVar 4=themeVar
-      //                 5=widthRef(unused) 6=dimVar
-      const patOld =
-        /let ([$\w]+)=Math\.max\(1,Math\.floor\(([$\w]+)\)\);return ([$\w]+)\.render\(([$\w]+),([$\w]+),([$\w]+)\)/;
-
-      const matchOld = oldFile.match(patOld);
-      if (!matchOld || matchOld.index === undefined) {
-        console.error(
-          'patch: diffSyntaxThemeOverride: failed to find nI useMemo render call'
-        );
-        return null;
-      }
-
-      const [, widthVar, rawWidthVar, moduleVar, themeVar, , dimVar] = matchOld;
-      replacement =
-        `let ${widthVar}=Math.max(1,Math.floor(${rawWidthVar}));` +
-        `return ${moduleVar}.render(` +
-        `${BUILTIN_THEMES}.test(${themeVar})?${themeVar}:"dark-ansi"` +
-        `,${widthVar},${dimVar})`;
-      matchIndex = matchOld.index;
-      matchLength = matchOld[0].length;
-    }
+    console.error(
+      'patch: diffSyntaxThemeOverride: failed to find nI useMemo render call'
+    );
+    return null;
   }
 
   const newFile =

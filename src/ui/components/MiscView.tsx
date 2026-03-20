@@ -325,20 +325,6 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
-        id: 'mcpNonBlocking',
-        title: 'Non-blocking MCP startup',
-        description:
-          'Start immediately while MCP servers connect in background. Reduces startup time ~50% with multiple MCPs.',
-        getValue: () => settings.misc?.mcpConnectionNonBlocking ?? true,
-        toggle: () => {
-          updateSettings(settings => {
-            ensureMisc();
-            settings.misc!.mcpConnectionNonBlocking =
-              !settings.misc!.mcpConnectionNonBlocking;
-          });
-        },
-      },
-      {
         id: 'mcpBatchSize',
         title: 'MCP server batch size',
         description: `Parallel MCP connections (${MCP_BATCH_SIZE_MIN}-${MCP_BATCH_SIZE_MAX}). Use ←/→ to adjust. Higher = faster startup, more resources.`,

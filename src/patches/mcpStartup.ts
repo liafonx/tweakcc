@@ -4,36 +4,9 @@
 // Based on: https://cuipengfei.is-a.dev/blog/2026/01/24/claude-code-mcp-startup-optimization/
 //
 // This patch modifies Claude Code's MCP connection behavior:
-// - MCP_CONNECTION_NONBLOCKING: Don't block startup waiting for all MCPs to connect
 // - MCP_SERVER_CONNECTION_BATCH_SIZE: Connect more servers in parallel (default: 3)
 
 import { showDiff, LocationResult } from './index';
-
-/**
- * Find the MCP non-blocking check location.
- *
- * Pattern: !someVar(process.env.MCP_CONNECTION_NONBLOCKING)
- * This check determines whether to block on MCP connections.
- * Replacing it with "false" forces non-blocking mode.
- */
-const getNonBlockingCheckLocation = (
-  oldFile: string
-): LocationResult | null => {
-  // Match: !VARNAME(process.env.MCP_CONNECTION_NONBLOCKING)
-  // The variable name changes between npm/native builds, so we match any identifier
-  const pattern = /![$\w]+\(process\.env\.MCP_CONNECTION_NONBLOCKING\)/;
-  const match = oldFile.match(pattern);
-
-  if (!match || match.index === undefined) {
-    // MCP_CONNECTION_NONBLOCKING was removed in CC 2.1.80 — non-fatal, skip silently
-    return null;
-  }
-
-  return {
-    startIndex: match.index,
-    endIndex: match.index + match[0].length,
-  };
-};
 
 /**
  * Find the MCP batch size default value location.
@@ -66,27 +39,6 @@ const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
     startIndex,
     endIndex,
   };
-};
-
-/**
- * Apply non-blocking MCP startup by replacing the blocking check with "false".
- */
-export const writeMcpNonBlocking = (oldFile: string): string | null => {
-  const location = getNonBlockingCheckLocation(oldFile);
-  if (!location) {
-    // Pattern not found (removed in CC 2.1.80+) — return unchanged so batch size can still apply
-    return oldFile;
-  }
-
-  // Replace the check with "false" to force non-blocking mode
-  const newValue = 'false';
-  const newFile =
-    oldFile.slice(0, location.startIndex) +
-    newValue +
-    oldFile.slice(location.endIndex);
-
-  showDiff(oldFile, newFile, newValue, location.startIndex, location.endIndex);
-  return newFile;
 };
 
 /**

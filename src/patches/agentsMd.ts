@@ -13,27 +13,6 @@ import { showDiff } from './index';
  *    is true)
  * 3. Recursive calls pass didReroute=true to avoid infinite loops
  *
- * CC ~2.1.62 (single all-in-one function):
- * ```diff
- * -function _t7(A, q) {
- * +function _t7(A, q, didReroute) {
- *    try {
- *      let K = x1();
- * -    if (!K.existsSync(A) || !K.statSync(A).isFile()) return null;
- * +    if (!K.existsSync(A) || !K.statSync(A).isFile()) {
- * +      if (!didReroute && (A.endsWith("/CLAUDE.md") || A.endsWith("\\CLAUDE.md"))) {
- * +        for (let alt of ["AGENTS.md", "GEMINI.md", "QWEN.md"]) {
- * +          let altPath = A.slice(0, -9) + alt;
- * +          if (K.existsSync(altPath) && K.statSync(altPath).isFile())
- * +            return _t7(altPath, q, true);
- * +        }
- * +      }
- * +      return null;
- * +    }
- *      ...
- *  }
- * ```
- *
  * CC 2.1.80+: file reading was split — the sync reader (XmK) calls a separate
  * content processor (tq7). The ENOENT/EISDIR error is handled in a separate
  * error-handler function (eq7). We patch XmK's catch block instead:
@@ -100,84 +79,6 @@ export const writeAgentsMd = (
     return newFile;
   }
 
-  // ── Strategy B: CC ~2.1.62–2.1.79 all-in-one function ───────────────────
-  const funcPattern =
-    /(function ([$\w]+)\(([$\w]+),([^)]+?))\)(?:.|\n){0,500}Skipping non-text file in @include/;
-
-  const funcMatch = file.match(funcPattern);
-  if (!funcMatch || funcMatch.index === undefined) {
-    console.error('patch: agentsMd: failed to find CLAUDE.md reading function');
-    return null;
-  }
-  const upToFuncParamsClosingParen = funcMatch[1];
-  const functionName = funcMatch[2];
-  const firstParam = funcMatch[3];
-  const restParams = funcMatch[4];
-  const funcStart = funcMatch.index;
-
-  const fsPattern = /([$\w]+(?:\(\))?)\.(?:readFileSync|existsSync|statSync)/;
-  const fsMatch = funcMatch[0].match(fsPattern);
-  if (!fsMatch) {
-    console.error('patch: agentsMd: failed to find fs expression in function');
-    return null;
-  }
-  const fsExpr = fsMatch[1];
-
-  // Step 1: Add didReroute parameter to function signature
-  const sigIndex = funcStart + upToFuncParamsClosingParen.length;
-  let newFile = file.slice(0, sigIndex) + ',didReroute' + file.slice(sigIndex);
-
-  showDiff(file, newFile, ',didReroute', sigIndex, sigIndex);
-
-  // Step 2: Inject fallback at the early return null (when file doesn't exist)
-  const funcBody = newFile.slice(funcStart);
-
-  // Try pre-2.1.70 pattern first (existsSync/statSync/isFile guard)
-  const earlyReturnOld = /\.isFile\(\)\)return null/;
-  const earlyReturnMatchOld = funcBody.match(earlyReturnOld);
-
-  if (earlyReturnMatchOld && earlyReturnMatchOld.index !== undefined) {
-    const fallback = `if(!didReroute&&(${firstParam}.endsWith("/CLAUDE.md")||${firstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${firstParam}.slice(0,-9)+alt;if(${fsExpr}.existsSync(altPath)&&${fsExpr}.statSync(altPath).isFile())return ${functionName}(altPath,${restParams},true);}}`;
-
-    const earlyReturnStart = funcStart + earlyReturnMatchOld.index;
-    const oldStr = earlyReturnMatchOld[0];
-    const newStr = `.isFile()){${fallback}return null;}`;
-
-    newFile =
-      newFile.slice(0, earlyReturnStart) +
-      newStr +
-      newFile.slice(earlyReturnStart + oldStr.length);
-
-    showDiff(file, newFile, newStr, earlyReturnStart, earlyReturnStart);
-  } else {
-    // 2.1.70+: try/catch with ENOENT/EISDIR instead of isFile guard
-    const earlyReturnNew = /==="ENOENT"\|\|([$\w]+)==="EISDIR"\)return null;/;
-    const earlyReturnMatchNew = funcBody.match(earlyReturnNew);
-
-    if (!earlyReturnMatchNew || earlyReturnMatchNew.index === undefined) {
-      console.error(
-        'patch: agentsMd: failed to find early return null for injection'
-      );
-      return null;
-    }
-
-    // Recursive call — the function handles ENOENT gracefully
-    const fallback = `if(!didReroute&&(${firstParam}.endsWith("/CLAUDE.md")||${firstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${firstParam}.slice(0,-9)+alt;let r=${functionName}(altPath,${restParams},true);if(r)return r;}}`;
-
-    const earlyReturnStart = funcStart + earlyReturnMatchNew.index;
-    const oldStr = earlyReturnMatchNew[0];
-    const newStr = oldStr.replace(
-      ')return null;',
-      `){${fallback}return null;}`
-    );
-
-    newFile =
-      newFile.slice(0, earlyReturnStart) +
-      newStr +
-      newFile.slice(earlyReturnStart + oldStr.length);
-
-    showDiff(file, newFile, newStr, earlyReturnStart, earlyReturnStart);
-  }
-
-  return newFile;
+  console.error('patch: agentsMd: failed to find CLAUDE.md reading function');
+  return null;
 };

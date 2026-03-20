@@ -60,7 +60,7 @@ import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSessionMemory } from './sessionMemory';
 import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
-import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
+import { writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
 import { writeAgentsMd } from './agentsMd';
@@ -93,6 +93,7 @@ export {
   clearRequireFuncNameCache,
   findTextComponent,
   findBoxComponent,
+  escapeForRegex,
 } from './helpers';
 
 export interface LocationResult {
@@ -407,12 +408,6 @@ const PATCH_DEFINITIONS = [
     name: 'Toolsets',
     group: PatchGroup.FEATURES,
     description: 'Custom toolsets will be registered',
-  },
-  {
-    id: 'mcp-non-blocking',
-    name: 'MCP non-blocking',
-    group: PatchGroup.FEATURES,
-    description: 'If you have MCP servers, CC startup will be much faster',
   },
   {
     id: 'mcp-batch-size',
@@ -871,10 +866,6 @@ export const applyCustomization = async (
       condition: !!(
         config.settings.toolsets && config.settings.toolsets.length > 0
       ),
-    },
-    'mcp-non-blocking': {
-      fn: c => writeMcpNonBlocking(c),
-      condition: !!config.settings.misc?.mcpConnectionNonBlocking,
     },
     'mcp-batch-size': {
       fn: c => writeMcpBatchSize(c, config.settings.misc!.mcpServerBatchSize!),
