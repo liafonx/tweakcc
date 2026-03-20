@@ -339,6 +339,15 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
     return boxDisplayNameMatch[1];
   }
 
+  // Method 4: React Compiler cached Box (CC 2.1.80+)
+  // Pattern: function NAME(_){let T=VAR.c(N),...{children:...,flexWrap:...
+  const reactCompilerBoxPattern =
+    /function ([$\w]+)\(_\)\{let [$\w]+=[$\w]+\.c\(\d+\)[^}]+\{children:[$\w]+,flexWrap:[$\w]+/;
+  const reactCompilerBoxMatch = fileContents.match(reactCompilerBoxPattern);
+  if (reactCompilerBoxMatch) {
+    return reactCompilerBoxMatch[1];
+  }
+
   console.error(
     'patch: findBoxComponent: failed to find Box component (neither ink-box createElement nor displayName found)'
   );

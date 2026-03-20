@@ -13,7 +13,7 @@ import { showDiff } from './index';
  *    is true)
  * 3. Recursive calls pass didReroute=true to avoid infinite loops
  *
- * CC 2.1.62 (approx. by Claude):
+ * CC ~2.1.62 (single all-in-one function):
  * ```diff
  * -function _t7(A, q) {
  * +function _t7(A, q, didReroute) {
@@ -30,27 +30,77 @@ import { showDiff } from './index';
  * +      }
  * +      return null;
  * +    }
- *      let Y = UL9(A).toLowerCase();
- *      if (Y && !dL9.has(Y))
- *        return (I(`Skipping non-text file in @include: ${A}`), null);
- *      let z = K.readFileSync(A, { encoding: "utf-8" }),
- *        { content: w, paths: H } = cL9(z);
- *      return { path: A, type: q, content: w, globs: H };
- *    } catch (K) {
- *      if (K instanceof Error && K.message.includes("EACCES"))
- *        n("tengu_claude_md_permission_error", {
- *          is_access_error: 1,
- *          has_home_dir: A.includes(_8()) ? 1 : 0,
- *        });
- *    }
- *    return null;
+ *      ...
  *  }
+ * ```
+ *
+ * CC 2.1.80+: file reading was split — the sync reader (XmK) calls a separate
+ * content processor (tq7). The ENOENT/EISDIR error is handled in a separate
+ * error-handler function (eq7). We patch XmK's catch block instead:
+ * ```diff
+ * -function XmK(_, T) {
+ * +function XmK(_, T, didReroute) {
+ *    try {
+ *      let K = OT().readFileSync(_, { encoding: "utf-8" });
+ *      return tq7(K, _, T);
+ *    } catch(q) {
+ * +    if (!didReroute && q.code === "ENOENT" &&
+ * +        (_.endsWith("/CLAUDE.md") || _.endsWith("\\CLAUDE.md"))) {
+ * +      for (let alt of ["AGENTS.md", "GEMINI.md", "QWEN.md"]) {
+ * +        let altPath = _.slice(0, -9) + alt;
+ * +        let r = XmK(altPath, T, true);
+ * +        if (r) return r;
+ * +      }
+ * +    }
+ *      return eq7(q, _), null;
+ *    }
+ * }
  * ```
  */
 export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
+  const altNamesJson = JSON.stringify(altNames);
+
+  // ── Strategy A: CC 2.1.80+ split-reader pattern ──────────────────────────
+  // function XmK(_,T){try{let K=OT().readFileSync(_,{encoding:"utf-8"});return tq7(K,_,T)}catch(q){return eq7(q,_),null}}
+  const splitReaderPattern =
+    /function ([$\w]+)\(([$\w]+),([$\w]+)\)\{try\{let [$\w]+=[$\w]+\(\)\.readFileSync\(\2,\{encoding:"utf-8"\}\);return [$\w]+\([^)]+\)\}catch\(([$\w]+)\)\{return [$\w]+\(\4,\2\),null\}\}/;
+  const splitReaderMatch = file.match(splitReaderPattern);
+
+  if (splitReaderMatch && splitReaderMatch.index !== undefined) {
+    const [fullMatch, funcName, pathParam, typeParam, errVar] =
+      splitReaderMatch;
+
+    // Add didReroute param and inject ENOENT fallback in catch block
+    const fallback = `if(!didReroute&&${errVar}.code==="ENOENT"&&(${pathParam}.endsWith("/CLAUDE.md")||${pathParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${pathParam}.slice(0,-9)+alt;let r=${funcName}(altPath,${typeParam},true);if(r)return r;}}`;
+    const newFunc = fullMatch
+      .replace(
+        `function ${funcName}(${pathParam},${typeParam})`,
+        `function ${funcName}(${pathParam},${typeParam},didReroute)`
+      )
+      .replace(
+        `}catch(${errVar}){return`,
+        `}catch(${errVar}){${fallback}return`
+      );
+
+    const newFile =
+      file.slice(0, splitReaderMatch.index) +
+      newFunc +
+      file.slice(splitReaderMatch.index + fullMatch.length);
+
+    showDiff(
+      file,
+      newFile,
+      newFunc,
+      splitReaderMatch.index,
+      splitReaderMatch.index + fullMatch.length
+    );
+    return newFile;
+  }
+
+  // ── Strategy B: CC ~2.1.62–2.1.79 all-in-one function ───────────────────
   const funcPattern =
     /(function ([$\w]+)\(([$\w]+),([^)]+?))\)(?:.|\n){0,500}Skipping non-text file in @include/;
 
@@ -72,8 +122,6 @@ export const writeAgentsMd = (
     return null;
   }
   const fsExpr = fsMatch[1];
-
-  const altNamesJson = JSON.stringify(altNames);
 
   // Step 1: Add didReroute parameter to function signature
   const sigIndex = funcStart + upToFuncParamsClosingParen.length;

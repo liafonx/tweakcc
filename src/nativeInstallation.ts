@@ -655,7 +655,11 @@ export function extractClaudeJsFromNativeInstallation(
       `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes, moduleStructSize=${moduleStructSize}`
     );
 
-    const result = mapModules(
+    // CC 2.1.80+: multiple modules can match isClaudeModule; pick the largest
+    // (the main app bundle). Earlier versions had only one match, so this is
+    // backward-compatible.
+    let bestResult: Buffer | null = null;
+    mapModules(
       bunData,
       bunOffsets,
       moduleStructSize,
@@ -678,12 +682,19 @@ export function extractClaudeJsFromNativeInstallation(
           `extractClaudeJsFromNativeInstallation: Found claude module, contents length=${moduleContents.length}`
         );
 
-        return moduleContents.length > 0 ? moduleContents : undefined;
+        if (
+          moduleContents.length > 0 &&
+          (!bestResult || moduleContents.length > bestResult.length)
+        ) {
+          bestResult = moduleContents;
+        }
+
+        return undefined; // keep iterating to find all matching modules
       }
     );
 
-    if (result) {
-      return result;
+    if (bestResult) {
+      return bestResult;
     }
 
     debug(
@@ -722,6 +733,18 @@ function rebuildBunData(
     side: number;
   }> = [];
 
+  // CC 2.1.80+: multiple modules can match isClaudeModule; only replace the
+  // largest one (the main app bundle) to match what extractClaudeJsFromNativeInstallation returns.
+  let largestClaudeModuleSize = 0;
+  if (modifiedClaudeJs) {
+    mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
+      if (!isClaudeModule(moduleName)) return undefined;
+      const size = getStringPointerContent(bunData, module.contents).length;
+      if (size > largestClaudeModuleSize) largestClaudeModuleSize = size;
+      return undefined;
+    });
+  }
+
   // Use mapModules to iterate and collect module data
   mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
     const nameBytes = getStringPointerContent(bunData, module.name);
@@ -729,7 +752,15 @@ function rebuildBunData(
     // Check if this is claude.js and we have modified contents
     let contentsBytes: Buffer;
     if (modifiedClaudeJs && isClaudeModule(moduleName)) {
-      contentsBytes = modifiedClaudeJs;
+      // Only replace the largest matching module (the main app bundle)
+      const originalContents = getStringPointerContent(
+        bunData,
+        module.contents
+      );
+      contentsBytes =
+        originalContents.length === largestClaudeModuleSize
+          ? modifiedClaudeJs
+          : originalContents;
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
     }

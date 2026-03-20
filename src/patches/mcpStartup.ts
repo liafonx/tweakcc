@@ -25,9 +25,7 @@ const getNonBlockingCheckLocation = (
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: mcpStartup: failed to find MCP_CONNECTION_NONBLOCKING check'
-    );
+    // MCP_CONNECTION_NONBLOCKING was removed in CC 2.1.80 — non-fatal, skip silently
     return null;
   }
 
@@ -76,7 +74,8 @@ const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
 export const writeMcpNonBlocking = (oldFile: string): string | null => {
   const location = getNonBlockingCheckLocation(oldFile);
   if (!location) {
-    return null;
+    // Pattern not found (removed in CC 2.1.80+) — return unchanged so batch size can still apply
+    return oldFile;
   }
 
   // Replace the check with "false" to force non-blocking mode
