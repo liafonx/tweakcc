@@ -12,9 +12,10 @@ import { showDiff } from './index';
  * - A fixed interval that updates regularly regardless of calls (when `useFixedInterval` is true)
  *
  * There are two formats in the minified code:
- * - Older: `F = Ue(G, 300)` - where the function (G) is passed directly to the flawed throttler (Ue)
- * - Newer: `W = fXA(() => I(A), 300)` - where the function (I) is called with a parameter (A)
- *   in a callback passed to the flawed throttler (fXA)
+ * - Callback wrapper: `W = fXA(() => I(A), 300)` - where the function (I) is called with a
+ *   parameter (A) in a callback passed to the flawed throttler (fXA)
+ * - Arrow-function+setTimeout: `W = R.useCallback(() => { ... setTimeout(..., 300, ...) }, [R])`
+ *   where the throttle is implemented via a ref-based setTimeout
  *
  * CC 2.1.21 (throttle mode):
  * ```diff
@@ -74,15 +75,19 @@ export const writeStatuslineUpdateThrottle = (
   useFixedInterval: boolean = false
 ): string | null => {
   // Pattern breakdown:
-  // - (([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?)
+  // - (,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?)
   //   Match[1]: Everything up to and including the statusLineText context (firstPart)
   //   Match[2]: The status line update function name (statuslineUpdateFn)
   //   Match[3]: The React variable, possibly with .default (reactVar)
   //
-  // - ([$\w]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\))
-  //   Match[4]: The old debounced invocation (to be replaced)
-  //   Match[5]: The function call with parameter if newer format (e.g., "I(A)")
-  //   Match[6]: The argument to the function if newer format (e.g., "A")
+  // - ([$\w]+)= followed by alternation (captured as match[5]):
+  //   Match[4]: The callback variable being assigned (callbackVar)
+  //   Match[5]: The old throttle/debounce RHS expression (being replaced)
+  //   Alt 1 — callback wrapper:
+  //     Match[6]: The function call with param (e.g., "I(A)")
+  //     Match[7]: The argument (e.g., "A")
+  //   Alt 2 — arrow-function+setTimeout:
+  //     Match[8]: The setTimeout callback params (e.g., "a,b")
   const pattern =
     /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?),([$\w]+)=([$\w.]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+(?:\.[$\w]+)?\.useCallback\(\(\)=>\{.{0,150}setTimeout\(\(([$\w]+,[$\w]+)\)=>\{[$\w]+\.current=void 0,[$\w]+\(\)\},300,[$\w]+,\2\)\},\[\2\]\))/;
 
@@ -99,14 +104,10 @@ export const writeStatuslineUpdateThrottle = (
   const statuslineUpdateFn = match[2];
   const reactVar = match[3];
   const callbackVar = match[4];
-  // match[4] is the old debounced invocation (being replaced)
-  // match[5] is the old debounced invocation (being replaced)
-  // match[6] is the function call with param if newer format (e.g., "I(A)")
-  // match[7] is the argument if newer format (e.g., "A")
 
   // Determine the function call to make
-  // Newer format: match[5] contains "I(A)"
-  // Older format: just call the function with no args
+  // Callback wrapper (Alt 1): match[6] contains "I(A)", match[7] contains "A"
+  // Arrow-function+setTimeout (Alt 2): match[6]/[7] are undefined
   const call = match[6] ?? `${statuslineUpdateFn}()`;
   const argument = match[7];
 

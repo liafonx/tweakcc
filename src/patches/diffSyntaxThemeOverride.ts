@@ -17,18 +17,10 @@ import { BUILTIN_THEME_IDS } from './themes';
  * ID, it substitutes "dark-ansi" so the Rust renderer always uses the
  * foreground-only ansi bat theme while preserving syntax highlighting.
  *
- * Three patterns supported:
- *
- * Pre-2.1.70 (direct return, inline render):
- *   let W=Math.max(1,Math.floor($));return J.render(q,W,A)
- *
- * 2.1.70 (React Compiler cached useMemo, inline render):
- *   let Z=Math.max(1,Math.floor(D)),N;if(R[6]!==J||...)N=J.render(h,Z,A)
- *
- * 2.1.71+ (render extracted to Ns$ wrapper function):
- *   The diff component calls Ns$(patch,firstLine,filePath,content,theme,width,dim)
- *   and Ns$ internally does: let Y=new H(_,q,T,K).render($,A,O)
- *   Anchored by factory-call + null-guard + WeakMap cache-check uniquely
+ * 2.1.71+ (render extracted to wrapper function):
+ *   The diff component calls the wrapper with (patch,firstLine,filePath,content,theme,width,dim)
+ *   and the wrapper does: let Y=new H(_,q,T,K).render($,A,O)
+ *   Anchored by factory-call + null-guard (backreference) + WeakMap cache-check uniquely
  *   identifying the ColorDiff wrapper function.
  */
 
@@ -37,10 +29,6 @@ const BUILTIN_THEMES = `/^(${BUILTIN_THEME_IDS.join('|')})$/`;
 export const writeDiffSyntaxThemeOverride = (
   oldFile: string
 ): string | null => {
-  let replacement: string;
-  let matchIndex: number;
-  let matchLength: number;
-
   // 2.1.71+: render extracted to wrapper function (Ns$-style)
   // let H=factory();if(!H)return null;let cache=...;if(hit)return hit;
   //   let Y=new H(_,q,T,K).render($,A,O)
@@ -54,23 +42,23 @@ export const writeDiffSyntaxThemeOverride = (
     /let ([$\w]+)=([$\w$]+)\(\);if\(!\1\)return null;let [^;]+;if\(([$\w]+)\)return \3;let ([$\w]+)=new \1\(([$\w]+),([$\w]+),([$\w]+),([$\w]+)\)\.render\(([$\w]+),([$\w]+),([$\w]+)\)/;
 
   const match2171 = oldFile.match(pat2171);
-  if (match2171 && match2171.index !== undefined) {
-    const [, classVar, , , , a1, a2, a3, a4, themeVar, widthVar, dimVar] =
-      match2171;
-    const oldRender = `new ${classVar}(${a1},${a2},${a3},${a4}).render(${themeVar},${widthVar},${dimVar})`;
-    const newRender =
-      `new ${classVar}(${a1},${a2},${a3},${a4}).render(` +
-      `${BUILTIN_THEMES}.test(${themeVar})?${themeVar}:"dark-ansi"` +
-      `,${widthVar},${dimVar})`;
-    replacement = match2171[0].replace(oldRender, newRender);
-    matchIndex = match2171.index;
-    matchLength = match2171[0].length;
-  } else {
+  if (!match2171 || match2171.index === undefined) {
     console.error(
-      'patch: diffSyntaxThemeOverride: failed to find nI useMemo render call'
+      'patch: diffSyntaxThemeOverride: failed to find ColorDiff wrapper function'
     );
     return null;
   }
+
+  const [, classVar, , , , a1, a2, a3, a4, themeVar, widthVar, dimVar] =
+    match2171;
+  const oldRender = `new ${classVar}(${a1},${a2},${a3},${a4}).render(${themeVar},${widthVar},${dimVar})`;
+  const newRender =
+    `new ${classVar}(${a1},${a2},${a3},${a4}).render(` +
+    `${BUILTIN_THEMES}.test(${themeVar})?${themeVar}:"dark-ansi"` +
+    `,${widthVar},${dimVar})`;
+  const replacement = match2171[0].replace(oldRender, newRender);
+  const matchIndex = match2171.index;
+  const matchLength = match2171[0].length;
 
   const newFile =
     oldFile.slice(0, matchIndex) +

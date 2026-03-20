@@ -33,9 +33,6 @@ export const findVersionOutputLocation = (
 /**
  * PATCH 2: Finds the location to insert tweakcc version in the header
  *
- * Pre-2.1.70 (contiguous):
- *   createElement(TEXT,{bold:!0},"Claude Code")," ",createElement(TEXT,{dimColor:!0},"v",VER)
- *
  * 2.1.70+ (React Compiler cached):
  *   createElement(TEXT,null,cachedBold," ",createElement(TEXT,{dimColor:!0},"v",VER))
  */
@@ -68,7 +65,7 @@ const findTweakccVersionLocation = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the bold "Claude Code" element (works for both old and 2.1.70+)
+  // 1. Find the bold "Claude Code" element
   const pattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)/;
   const match = fileContents.match(pattern);
