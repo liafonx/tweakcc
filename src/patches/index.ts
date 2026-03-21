@@ -72,6 +72,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeDiffSyntaxThemeOverride } from './diffSyntaxThemeOverride';
 import { writeForceToolSearch } from './forceToolSearch';
+import { writeShowClearContextOnPlanAccept } from './showClearContextOnPlanAccept';
 import { writeContextWarningThreshold } from './contextWarningThreshold';
 import { writeForceMaxSubscription } from './forceMaxSubscription';
 import {
@@ -180,6 +181,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Bypass api.anthropic.com domain check to enable Tool Search with proxy/relay endpoints',
+  },
+  {
+    id: 'show-clear-context-on-plan-accept',
+    name: 'Show clear context on plan accept',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Always show the "clear context and auto-accept edits" option in the plan mode exit dialog',
   },
   {
     id: 'fix-lsp-support',
@@ -683,6 +691,9 @@ export const applyCustomization = async (
     },
     'force-tool-search': {
       fn: c => writeForceToolSearch(c),
+    },
+    'show-clear-context-on-plan-accept': {
+      fn: c => writeShowClearContextOnPlanAccept(c),
     },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),
