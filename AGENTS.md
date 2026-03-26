@@ -78,10 +78,6 @@ gap constant to 0 (warning would only fire at 100% usage). Anchored by the adjac
 `13000` constant in the var declaration block (`var ...,vZq=13000,hrR=20000,...`).
 Enabled via `suppressContextWarning` boolean toggle in misc settings.
 
-**`forceToolSearch`** — bypasses the `api.anthropic.com` domain check that gates Tool
-Search, replacing `return["api.anthropic.com"].includes(host)}catch{return!1}` with
-`return!0}catch{return!0}`. Enables Tool Search when using proxy or relay endpoints.
-
 ## Development Commands
 
 ```bash
@@ -105,7 +101,6 @@ src/
     modelSelector.ts             # Fork: CUSTOM_MODELS injection
     forceMaxSubscription.ts      # Fork: force Max subscription for API-key users
     contextWarningThreshold.ts   # Fork: context warning gap override
-    forceToolSearch.ts           # Fork: bypass domain check for Tool Search
   tests/                         # Vitest: config, migration, systemPromptSync, etc.
   ui/                            # Ink/React terminal UI (theme editor, color picker)
   config.ts                      # ~/.tweakcc/ config read/write

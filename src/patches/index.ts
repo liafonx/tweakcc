@@ -71,10 +71,9 @@ import { writeSuppressUpdateNotification } from './suppressUpdateNotification';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeDiffSyntaxThemeOverride } from './diffSyntaxThemeOverride';
-import { writeForceToolSearch } from './forceToolSearch';
-import { writeShowClearContextOnPlanAccept } from './showClearContextOnPlanAccept';
 import { writeContextWarningThreshold } from './contextWarningThreshold';
 import { writeForceMaxSubscription } from './forceMaxSubscription';
+import { writeForceBypassPermissionsAvailable } from './forceBypassPermissionsAvailable';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -176,20 +175,6 @@ const PATCH_DEFINITIONS = [
       'Custom themes use the ansi bat theme for diffs: syntax highlighting with no background fills',
   },
   {
-    id: 'force-tool-search',
-    name: 'Force Tool Search',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description:
-      'Bypass api.anthropic.com domain check to enable Tool Search with proxy/relay endpoints',
-  },
-  {
-    id: 'show-clear-context-on-plan-accept',
-    name: 'Show clear context on plan accept',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description:
-      'Always show the "clear context and auto-accept edits" option in the plan mode exit dialog',
-  },
-  {
     id: 'fix-lsp-support',
     name: 'Fix LSP support',
     group: PatchGroup.ALWAYS_APPLIED,
@@ -207,6 +192,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Add opusplan (Opus for planning, Sonnet for execution) to the /model dropdown',
+  },
+  {
+    id: 'force-bypass-permissions-available',
+    name: 'Force bypass permissions available',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'bypassPermissions always appears in the Shift+Tab permission mode cycle',
   },
   // Misc Configurable
   {
@@ -689,12 +681,6 @@ export const applyCustomization = async (
     'diff-syntax-theme-override': {
       fn: c => writeDiffSyntaxThemeOverride(c),
     },
-    'force-tool-search': {
-      fn: c => writeForceToolSearch(c),
-    },
-    'show-clear-context-on-plan-accept': {
-      fn: c => writeShowClearContextOnPlanAccept(c),
-    },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),
     },
@@ -709,6 +695,9 @@ export const applyCustomization = async (
     },
     'opus-plan-model': {
       fn: c => writeOpusPlanModel(c),
+    },
+    'force-bypass-permissions-available': {
+      fn: c => writeForceBypassPermissionsAvailable(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
