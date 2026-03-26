@@ -300,9 +300,13 @@ export const findBoxComponent = (fileContents: string): string => {
   }
 
   // Method 4: React Compiler cached Box (CC 2.1.80+)
-  // Pattern: function NAME(_){let T=VAR.c(N),...{children:...,flexWrap:...
+  // CC 2.1.80-2.1.83: function NAME(_){let T=VAR.c(N),...{children:...,flexWrap:...
+  //   (parameter is `_`, cache is the first named var)
+  // CC 2.1.84+: function NAME(H){let _=VAR.c(42),...;if(_[0]!==H){let{children:C,flexWrap:V...
+  //   (parameter is any ident, cache var is `_`, destructuring is inside if block)
+  // Generalised: any single param, any cache var, `.{0,200}` to cross the `if` block boundary.
   const reactCompilerBoxPattern =
-    /function ([$\w]+)\(_\)\{let [$\w]+=[$\w]+\.c\(\d+\)[^}]+\{children:[$\w]+,flexWrap:[$\w]+/;
+    /function ([$\w]+)\([$\w]+\)\{let [$\w]+=[$\w]+\.c\(\d+\).{0,200}children:[$\w]+,flexWrap:/;
   const reactCompilerBoxMatch = fileContents.match(reactCompilerBoxPattern);
   if (reactCompilerBoxMatch) {
     return reactCompilerBoxMatch[1];
